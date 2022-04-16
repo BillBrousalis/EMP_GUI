@@ -1,0 +1,2 @@
+>>> Overall updated looks
+bugfixes - crash prevention

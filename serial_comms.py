@@ -10,25 +10,19 @@ import timeit
 #------------------------------------------CREATING SERIAL CLASS------------------------------------------
 class SerialClass():
     #------------------------------------------generic variables------------------------------------------
-    baud_rate_list = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 76800, 115200]
     available_ports_list = []
-    
-    default_com = 'COM16'
-    default_baud = 115200
     
     default_servo_speed = 50
 
     x_limit = 50    # seconds to display in the X axis
     
-    configFile = "files\\config.txt"
-
-
     #------------------------------------------INITIALIZING------------------------------------------
     def __init__(self):
         super().__init__()
-        self.connect_state = "Not Connected"
-        self.COM = self.default_com
-        self.BAUD = self.default_baud
+        self.connected = False
+        self.baud_rate_list = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 76800, 115200]
+        self.COM = 'COM16'
+        self.BAUD = self.baud_rate_list[-1]
         #since app opens with a non-quaternion tab as its first tab, we have quat set to false by default
         self.quat = False
 
@@ -57,41 +51,40 @@ class SerialClass():
 
     # read the config file to retrieve data for the last com port / baud rate used
     def read_last_config(self):   
-        with open(self.configFile, 'r') as file:
-            lines = file.readlines()
-            lines = [line.replace('\n', '') for line in lines]
-            for line in lines:
-                if "DEFAULT_COM" in line:
-                    self.default_com = line.replace("DEFAULT_COM", '').replace(' ', '').replace('=', '')
-                elif "DEFAULT_BAUD" in line:
-                    self.default_baud = line.replace("DEFAULT_BAUD", '').replace(' ', '').replace('=', '')
-                    self.default_baud = int(self.default_baud)
-            
-                elif "GRAPH_DISPLAY_LAST_X_SECONDS" in line:
-                    tmp = line.replace("GRAPH_DISPLAY_LAST_X_SECONDS", '').replace(' ', '').replace('=', '')
-                    tmp = float(tmp)
-                    self.x_limit = tmp * 10
-                elif "DEFAULT_SERVO_SPEED" in line:
-                    self.default_servo_speed = line.replace("DEFAULT_SERVO_SPEED", "").replace(' ', '').replace('=', '')
-                    self.default_servo_speed = int(self.default_servo_speed)
-                elif "ZERO" in line:
-                    val = float(line.split('/')[1].split('=')[1])
-                    abs_rel_state = 'Abs' if 'ABS' in line.split('/')[0] else 'Rel'
-                    if "ROLL" in line:
-                        self.abs_rel_toggle_states[0] = abs_rel_state
-                        self.rel_zero_values_list[0] = val
-                    elif "PITCH" in line:
-                        self.abs_rel_toggle_states[1] = abs_rel_state
-                        self.rel_zero_values_list[1] = val
-                    elif "YAW" in line:
-                        self.abs_rel_toggle_states[2] = abs_rel_state
-                        self.rel_zero_values_list[2] = val
-                    elif "VANE" in line:
-                        self.abs_rel_toggle_states[3] = abs_rel_state
-                        self.rel_zero_values_list[3] = val
-                    elif "WING" in line:
-                        self.abs_rel_toggle_states[4] = abs_rel_state
-                        self.rel_zero_values_list[4] = val
+        with open('files\config.txt', 'r') as file:
+            lines = [x.strip() for x in file.readlines()]
+        for line in lines:
+            if "DEFAULT_COM" in line:
+                self.default_com = line.replace("DEFAULT_COM", '').replace(' ', '').replace('=', '')
+            elif "DEFAULT_BAUD" in line:
+                self.default_baud = line.replace("DEFAULT_BAUD", '').replace(' ', '').replace('=', '')
+                self.default_baud = int(self.default_baud)
+        
+            elif "GRAPH_DISPLAY_LAST_X_SECONDS" in line:
+                tmp = line.replace("GRAPH_DISPLAY_LAST_X_SECONDS", '').replace(' ', '').replace('=', '')
+                tmp = float(tmp)
+                self.x_limit = tmp * 10
+            elif "DEFAULT_SERVO_SPEED" in line:
+                self.default_servo_speed = line.replace("DEFAULT_SERVO_SPEED", "").replace(' ', '').replace('=', '')
+                self.default_servo_speed = int(self.default_servo_speed)
+            elif "ZERO" in line:
+                val = float(line.split('/')[1].split('=')[1])
+                abs_rel_state = 'Abs' if 'ABS' in line.split('/')[0] else 'Rel'
+                if "ROLL" in line:
+                    self.abs_rel_toggle_states[0] = abs_rel_state
+                    self.rel_zero_values_list[0] = val
+                elif "PITCH" in line:
+                    self.abs_rel_toggle_states[1] = abs_rel_state
+                    self.rel_zero_values_list[1] = val
+                elif "YAW" in line:
+                    self.abs_rel_toggle_states[2] = abs_rel_state
+                    self.rel_zero_values_list[2] = val
+                elif "VANE" in line:
+                    self.abs_rel_toggle_states[3] = abs_rel_state
+                    self.rel_zero_values_list[3] = val
+                elif "WING" in line:
+                    self.abs_rel_toggle_states[4] = abs_rel_state
+                    self.rel_zero_values_list[4] = val
             
 
 
@@ -100,43 +93,52 @@ class SerialClass():
     # handle the connect function of the serial connection
     # keep track and change the connection state
     def connect_func(self):
-        if self.connect_state == "Not Connected":
-            #print("COM PORT IS : ", self.COM)
-            #print("BAUD RATE IS : ", self.BAUD)
+        if self.connected == False:
             try:
                 self.ser = serial.Serial(self.COM, self.BAUD, timeout=2)
                 self.ser.flush()
-                self.connect_state = "Connected"
-                #self.get_firmware_version()
-                print("Connected to", self.COM, "successfully!")
+                self.connected = True
+                print(f"Connected to {self.COM} successfully!")
             except Exception as e:
-                print("Error connecting to port ", self.COM, " ... ", e)
-                self.connect_state = "Not Connected"
-        elif self.connect_state == "Connected":
+                print(f"Error connecting to port {self.COM} ... {e}")
+        else:
             self.ser.close()
+            self.connected = False
             print("Closing serial connection with port", self.COM)
-            self.connect_state = "Not Connected"
-
-
         
 
     # used to send data through the serial port
-    def send_data(self, to_send):
-        if self.connect_state == "Connected" and self.ser != None:
+    def send(self, dat):
+        if self.connected == True and self.ser != None:
             try:
-                self.ser.write(to_send.encode())
-                print(f"SENDING... : '{to_send}'")     
+                self.ser.write(dat.encode())
+                print(f"SENDING... : '{dat}'")     
             except:
                 print('error sending...')
-                
         else:
             print("Connect to a serial port first...")
 
 
 
+    def receive(self, json=True):
+        if self.connected:
+            try:
+                rec = self.ser.readline().decode()
+                if json:
+                    return json.loads(rec)
+                return rec
+            except:
+                print('error in receive')
+        
+        else:
+            print('Not connected')
+
+       
+
+    '''
     # read data available to the serial port
-    def receive_data(self): 
-        if self.ser != None and self.connect_state == "Connected":
+    def receive(self): 
+        if self.connected == True and self.ser != None:
             try:
                 self.is_reading_serial = True
                 self.received = self.ser.readline().decode()
@@ -152,6 +154,7 @@ class SerialClass():
                         print(f'faulty json received... <receive_data> : {self.received}')
             except Exception as e:
                 print(f"receive_data error : {e}")
+    '''
                 
 
     # if quat is false, collect data in an organized matter for 
@@ -177,48 +180,19 @@ class SerialClass():
                         self.graph_data[index].pop(0)
                     self.graph_data[index].append(value)
             
-            '''
-            if self.logging:
-                csv_data = ','.join([str(val) for val in item])
-                self.csv_data_batch.append(csv_data)
-                if len(self.csv_data_batch) >= self.write_batch_size:
-                    self.write_to_csv()
-                    self.csv_data_batch.clear()
-            '''
-
             self.is_reading_serial = False
 
-            """
-            # timing loop
-            time_end = time.time()
-            print(f'loop time : {time_end - self.time_start}')
-            self.time_start = time_end
-            """
 
 
 
-
-    def toggle_logging(self, state):
-        if self.connect_state == 'Connected':
+    def toggle_record(self, state):
+        if self.connected == True:
             if state == 'on':
                 self.send_data("recstart\n")
             else:
                 self.send_data("recstop\n")
-    '''
-                self.logging = True
-                # open csv file to prepare data writing
-                timestamp = datetime.now()
-                title_timestamp = timestamp.strftime("%d-%m-%Y--%H-%M-%S")
-                timestamp = timestamp.strftime("%d/%m/%Y %H:%M:%S")
-                csv_start = f'~~~{timestamp}~~~\nRoll, Pitch, Yaw, Vane, Wing :'
-                self.csv_logging = open(f'value_logging\\logging({title_timestamp}).csv', 'w+')
-                self.csv_logging.write(f'{csv_start}')
-            
-            elif state == 'off':
-                self.close_csv()
-                self.logging = False
-    '''
-
+    
+             
 
 
     # flush the serial
@@ -237,8 +211,6 @@ class SerialClass():
 
 
 
-
-
     # clear data collected
     def clear_data(self):
         self.t_count = 0
@@ -251,57 +223,41 @@ class SerialClass():
 
     # check for avaiable ports
     def refresh_ports(self):
-        self.available_ports_list.clear()
+        avail_ports = []
         for i in range(1,32):
-            com_str = 'COM'+str(i)
+            com = f'COM{i}'
             try:
-                s = serial.Serial(com_str)
-                self.available_ports_list.append('COM'+str(i))
+                s = serial.Serial(com)
+                avail_ports.append(com)
                 s.close()
             except:
                 pass
-        if len(self.available_ports_list) == 0:
-            self.available_ports_list.append('---')
-        print("available ports:", self.available_ports_list)
+        if len(avail_ports) == 0:
+            avail_ports.append('---')
+        return avail_ports
 
 
-
-
-
-    def receive_dump(self):
-        if self.connect_state == "Connected":
+    def get_dump(self):
+        if self.connected:
             dump = ''
             while dump == '':
-                self.send_data("dump1\n")
-                dump = self.ser.readline().decode()
+                self.send("dump1\n")
+                dump = self.receive(json=False)
                 try:
                     dump = json.loads(dump)
                 except:
                     dump = ''
                     print('not valid json in receive dump...')
                     time.sleep(0.05)
-                
                 if 'offs' in dump:
                     return dump
                 else:
                     dump = ''
 
 
-    def write_to_csv(self):
-        to_write = '\n' + '\n'.join(self.csv_data_batch)
-        self.csv_logging.write(to_write)
-
-
-    def close_csv(self):
-        if self.logging:
-            self.csv_logging.close()
-
-
-
-    # get current firmware version
     def get_firmware_version(self):
         try:
-            if self.connect_state == "Connected":
+            if self.connected:
                 self.send_data('vers\n')
                 time.sleep(0.05)
                 self.serialFlush()

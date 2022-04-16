@@ -27,69 +27,20 @@ class Application(tk.Tk):
     HEIGHT = 500
     WIDTH = 480
 
-    light_color = '#f2f2f2'
-    light_grey = '#e8e8e8'
-    blue_color = '#82b5c4'
-    black_color = '#212121'
-    highlight_color = '#e3f7ff'
-
-
+    colors = {
+        "white": '#f2f2f2',
+        "light grey": '#e8e8e8',
+        "blue": '#82b5c4',
+        "black": '#212121',
+        "highlight": '#e3f7ff'
+    }
+    # **************
     font = 'Helvetica '
-
-    configFile = "files\config.txt"
-    #refreshCOM_img_path = 'files\\pictures-icon\\refresh.png'
-    logo_img_path = 'files\pictures-icon\invibit_logo.png'
-
 
     graph_color_list = ['r','b', 'g', 'm', 'k']
 
-    number_of_graph_values = 5
-
     #---------------------DEFAULT / MIN / MAX VALUES OF ADJUSTABLE VARIABLES---------------------
-    default_offset = '0.00'
-    offset_min = -20.00
-    offset_max = 20.00
-
-    default_gain = '0.00'
-    gain_min = -5000.00
-    gain_max = 5000.00
-
-    default_vscale = '0.00'
-    vscale_min = -5000.00
-    vscale_max = 5000.00
-
-    default_delay = '0'
-    delay_min = 0
-    delay_max = 2000
-
-    default_velocity = '0'
-    velocity_min = 0
-    velocity_max = 5000000
-
-    default_acceleration = '0'
-    acceleration_min = 0
-    acceleration_max = 5000000
-
-    default_Kp = '0'
-    Kp_min = 0
-    Kp_max = 32767
-
-    default_Ki = '0'
-    Ki_min = 0
-    Ki_max = 32767
-
-    default_Kd = '0'
-    Kd_min = 0
-    Kd_max = 32767
-
-    default_Kv = '0'
-    Kv_min = 0
-    Kv_max = 32767
-
-    default_power_limit = '0'
-    power_limit_min = 0
-    power_limit_max = 100
-
+    # what the fuck is this for 
     default_servo_speed = 50
 
     #--------------------------------------------INITIALIZING CLASS--------------------------------------------
@@ -125,10 +76,9 @@ class Application(tk.Tk):
 
         self.tabs_to_be_updated = [1,2]
 
-        self.create_vane_tab()
+        self.create_tuning_tab()
         self.create_monitor_tab()                       
         self.create_graph_tab()
-        self.create_3D_tab()
         self.create_settings_tab()
         self.create_about_tab()
 
@@ -148,22 +98,22 @@ class Application(tk.Tk):
         
     #--------------------------------------------TOP OF THE FRAME / WIDGETS TO HANDLE SERIAL CONNECTIONS--------------------------------------------
     def create_serial_gui(self):
-        self.serial_canvas = tk.Canvas(self.mainFrame, width=self.WIDTH, height=self.HEIGHT/6, bg=self.light_grey, relief='groove')
+        self.serial_canvas = tk.Canvas(self.mainFrame, width=self.WIDTH, height=self.HEIGHT/6, bg=self.colors["light grey"], relief='groove')
         self.serial_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=0.08)
 
         Helvetica_10_bold = tkFont.Font(family='Helvetica', size=10, weight='bold')
 
-        self.port_label = tk.Label(self.serial_canvas, text='Com port:', font=Helvetica_10_bold, bg = self.light_grey)
+        self.port_label = tk.Label(self.serial_canvas, text='Com port:', font=Helvetica_10_bold, bg = self.colors["light grey"])
         self.port_label.place(anchor='n', relx=0.1, rely=0.15, relwidth=0.15, relheight=0.7)
 
         self.com_port_var = tk.StringVar(self.serial_canvas)
         self.com_port_var.set(self.myserial.default_com)
 
         self.com_port_menu = tk.OptionMenu(self.serial_canvas, self.com_port_var, *self.myserial.available_ports_list)
-        self.com_port_menu.config(font=Helvetica_10_bold, bg=self.light_grey, relief='groove')
+        self.com_port_menu.config(font=Helvetica_10_bold, bg=self.colors["light grey"], relief='groove')
         self.com_port_menu.place(anchor='n', relx=0.25, rely=0.155, relwidth=0.17, relheight=0.7)
 
-        self.refresh_com_ports_button = tk.Button(self.serial_canvas, text='Refresh', bg=self.light_grey, relief='groove',
+        self.refresh_com_ports_button = tk.Button(self.serial_canvas, text='Refresh', bg=self.colors["light grey"], relief='groove',
             command=functools.partial(self.update_port_OptionMenu))
         self.refresh_com_ports_button.bind('<Enter>', lambda event, x=self.refresh_com_ports_button : self.on_hover(x))
         self.refresh_com_ports_button.bind('<Leave>', lambda event, x=self.refresh_com_ports_button : self.on_hover_leave(x))
@@ -172,15 +122,15 @@ class Application(tk.Tk):
         self.baud_rate_var = tk.StringVar(self.serial_canvas) 
         self.baud_rate_var.set(str(self.myserial.default_baud))
 
-        self.baud_label = tk.Label(self.serial_canvas, text='Baud Rate:', font=Helvetica_10_bold, bg=self.light_grey)
+        self.baud_label = tk.Label(self.serial_canvas, text='Baud Rate:', font=Helvetica_10_bold, bg=self.colors["light grey"])
         self.baud_label.place(anchor='n', relx=0.52, rely=0.15, relwidth=0.15, relheight=0.7)
 
         self.baud_menu = tk.OptionMenu(self.serial_canvas, self.baud_rate_var, *self.myserial.baud_rate_list)
-        self.baud_menu.config(font=Helvetica_10_bold, bg=self.light_grey, relief='groove')
+        self.baud_menu.config(font=Helvetica_10_bold, bg=self.colors["light grey"], relief='groove')
         self.baud_menu.place(anchor='n', relx=0.68, rely=0.15, relwidth=0.17, relheight=0.7)
 
         self.connect_button = tk.Button(self.serial_canvas, text='Connect', font=Helvetica_10_bold, relief='groove',
-            bg=self.black_color, activebackground=self.light_grey, fg='white', command=functools.partial(self.connect_button_func))
+            bg=self.colors["black"], activebackground=self.colors["light grey"], fg='white', command=functools.partial(self.connect_button_func))
         self.connect_button.place(anchor='n', relx=0.875, rely=0.15, relwidth=0.17, relheight=0.7)
 
 
@@ -242,72 +192,67 @@ class Application(tk.Tk):
 
 
     #--------------------------------------------CREATING THE 'VANE / SERVO' TAB - ADDING WIDGETS--------------------------------------------
-    def create_vane_tab(self):
-        self.vane_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.vane_tab, text='Tuning')
-        self.vane_canvas = tk.Canvas(self.vane_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.light_color, relief='groove')
-        self.vane_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
+    def create_tuning_tab(self):
+        self.tuning_tab = ttk.Frame(self.tab_parent)
+        self.tab_parent.add(self.tuning_tab, text='Tuning')
+        self.tuning_canvas = tk.Canvas(self.tuning_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
+        self.tuning_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
 
         self.vane_values = dict()
 
-        self.vane_text_list = ['Offset :', 'Gain(Deg/Deg) :', 'Vane Scale(Deg/V) :', 'Delay(ms) :', 'Velocity :', 'Acceleration :', 'Kp :', 'Ki :', 'Kd :', 'Kv :', 'Power Limit(%) :']
-        self.vane_id_list = ['voffs ', 'vgain ', 'vscale ', 'vdelay ', 'vvel ', 'vacc ', 'kp ', 'ki ', 'kd ', 'kv ', 'power ']
-        self.vane_label_list = []
         self.vane_entry_widgets_list = []
-        self.up_button_list = []
-        self.down_button_list = []
 
-
-        # store default / min / max values of the enties in lists ( maybe dictionary would have been better idea (?))
-        self.min_values_list = [self.offset_min, self.gain_min, self.vscale_min, self.delay_min, self.velocity_min, self.acceleration_min, 
-            self.Kp_min, self.Ki_min, self.Kd_min, self.Kv_min, self.power_limit_min]
-
-        self.max_values_list = [self.offset_max, self.gain_max, self.vscale_max, self.delay_max, self.velocity_max, self.acceleration_max,
-             self.Kp_max, self.Ki_max, self.Kd_max, self.Kv_max, self.power_limit_max]
-
-        self.default_values_list = [self.default_offset, self.default_gain, self.default_vscale, self.default_delay, self.default_velocity, 
-            self.default_acceleration, self.default_Kp, self.default_Ki, self.default_Kd, self.default_Kv, self.default_power_limit]
+        self.tuning_values = [{"text": "Offset :", "min": -20, "max": 20, "default": 0, "id": "voffs", "type": float},
+                              {"text": "Gain(Deg/Deg) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vgain", "type": float},
+                              {"text": "Vane Scale(Deg/V) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vscale", "type": float},
+                              {"text": "Delay(ms) :", "min": 0, "max": 2000, "default": 0, "id": "vdelay", "type": int},
+                              {"text": "Velocity :", "min": 0, "max": 5000000, "default": 0, "id": "vvel", "type": int},
+                              {"text": "Acceleration :", "min": 0, "max": 5000000, "default": 0, "id": "vacc", "type": int}, 
+                              {"text": "Kp :", "min": 0, "max": 32767, "default": 0, "id": "kp", "type": int},
+                              {"text": "Ki :", "min": 0, "max": 32767, "default": 0, "id": "ki", "type": int},
+                              {"text": "Kd :", "min": 0, "max": 32767, "default": 0, "id": "kd", "type": int},
+                              {"text": "Kv :", "min": 0, "max": 32767, "default": 0, "id": "kv", "type": int},
+                              {"text": "Power Limit(%) :", "min": 0, "max": 100, "default": 0, "id": "power", "type": int}]
 
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
         #using a for loop to avoid massive block of repeating code
         
-        for i, (text, minimum, maximum, defaultval) in enumerate(zip(self.vane_text_list, self.min_values_list, self.max_values_list, self.default_values_list)):
+        #for i, (text, minimum, maximum, defaultval) in enumerate(zip(self.vane_text_list, self.min_values_list, self.max_values_list, self.default_values_list)):
+        for i, config in enumerate(self.tuning_values): 
             y = (0.03+i*0.08)
-            self.mylabel = tk.Label(self.vane_canvas, text=text, font=Helvetica_11_bold, bg = self.light_color, anchor='e')
+            self.mylabel = tk.Label(self.tuning_canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.mylabel.place(anchor='n', relx=0.17, rely=y, relwidth=0.3, relheight=0.065)  
-            self.vane_label_list.append(self.mylabel)
 
-            self.myentry = tk.Entry(self.vane_canvas, font=Helvetica_11_bold, bg=self.light_grey, justify='center', relief='groove')
-            self.myentry.insert(0, defaultval)
+            self.myentry = tk.Entry(self.tuning_canvas, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
+            self.myentry.insert(0, config["default"])
             self.myentry.bind('<Return>', lambda event, x=self.myentry: self.on_enter_press(x))
             self.myentry.bind('<Enter>', lambda event, x=self.myentry : self.on_hover(x))
             self.myentry.bind('<Leave>', lambda event, x=self.myentry : self.on_hover_leave(x))
             self.myentry.place(anchor='n', relx=0.54, rely=y+0.005, relwidth=0.42, relheight=0.055)
 
             #append entry widget to a list of the vane/servo 's tab entry widgets ------ access individual widget by using self.vane_entry_widgets_list[i]
+            # ***** jesus christ no *****
             self.vane_entry_widgets_list.append(self.myentry)
 
-            self.mydownbutton = tk.Button(self.vane_canvas, text='-', font='Helvetica 14 bold', bg=self.light_grey,
-                relief='groove', command=functools.partial(self.adjust_value, 'down', self.myentry, minimum, maximum))
+            self.mydownbutton = tk.Button(self.tuning_canvas, text='-', font='Helvetica 14 bold', bg=self.colors["light grey"],
+                relief='groove', command=functools.partial(self.adjust_value, 'down', self.myentry, config["min"], config["max"]))
             self.mydownbutton.bind('<Enter>', lambda event, x=self.mydownbutton : self.on_hover(x))
             self.mydownbutton.bind('<Leave>', lambda event, x=self.mydownbutton : self.on_hover_leave(x))    
             self.mydownbutton.place(anchor='n', relx=0.82, rely=y+0.005, relwidth=0.095, relheight=0.05)
-            self.down_button_list.append(self.mydownbutton)
 
-            self.myupbutton = tk.Button(self.vane_canvas, text='+', font='Helvetica 13 bold', bg=self.light_grey,
-                relief='groove', command=functools.partial(self.adjust_value, 'up', self.myentry, minimum, maximum))
+            self.myupbutton = tk.Button(self.tuning_canvas, text='+', font='Helvetica 13 bold', bg=self.colors["light grey"],
+                relief='groove', command=functools.partial(self.adjust_value, 'up', self.myentry, config["min"], config["max"]))
             self.myupbutton.bind('<Enter>', lambda event, x=self.myupbutton : self.on_hover(x))
             self.myupbutton.bind('<Leave>', lambda event, x=self.myupbutton : self.on_hover_leave(x))
             self.myupbutton.place(anchor='n', relx=0.92, rely=y+0.005, relwidth=0.095, relheight=0.05)
-            self.up_button_list.append(self.myupbutton)
 
 
 
         # SAVE - RESET DEFAULT VALUES BUTTONS
-        self.save_button = tk.Button(self.vane_canvas, text='Save', font=Helvetica_11_bold, bg=self.light_grey,
+        self.save_button = tk.Button(self.tuning_canvas, text='Save', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=functools.partial(self.save_values))
         self.save_button.bind('<Enter>', lambda event, x=self.save_button : self.on_hover(x))
         self.save_button.bind('<Leave>', lambda event, x=self.save_button : self.on_hover_leave(x))
@@ -444,7 +389,7 @@ class Application(tk.Tk):
     def create_monitor_tab(self):
         self.monitor_tab = ttk.Frame(self.tab_parent)
         self.tab_parent.add(self.monitor_tab, text='Monitor')
-        self.monitor_canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.light_color, relief='groove')
+        self.monitor_canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         self.monitor_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
 
@@ -461,23 +406,23 @@ class Application(tk.Tk):
         for i, text in enumerate(self.monitor_text_list):
             y = (0.05+i*0.11)
             defaultval = '0.00'
-            self.monitor_label = tk.Label(self.monitor_canvas, text=text, font=Helvetica_11_bold, bg = self.light_color, anchor='e')
+            self.monitor_label = tk.Label(self.monitor_canvas, text=text, font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.monitor_label.place(anchor='n', relx=0.13, rely=y, relwidth=0.11, relheight=0.06)  
             self.monitor_label_list.append(self.monitor_label)
 
-            self.monitor_value_label = tk.Label(self.monitor_canvas, text=defaultval, font=Helvetica_11_bold, bg=self.light_grey, justify='center', relief='groove')
+            self.monitor_value_label = tk.Label(self.monitor_canvas, text=defaultval, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
             self.monitor_value_label.place(anchor='n', relx=0.45, rely=y, relwidth=0.45, relheight=0.06)
 
             # like the vane/servo tab, store the monitor tab's label widgets in a list to access them individually with ease 
             self.monitor_value_label_list.append(self.monitor_value_label)
 
-            self.abs_rel_toggle_button = tk.Button(self.monitor_canvas, text='Abs', font=Helvetica_11_bold, bg=self.light_grey)
+            self.abs_rel_toggle_button = tk.Button(self.monitor_canvas, text='Abs', font=Helvetica_11_bold, bg=self.colors["light grey"])
             self.abs_rel_toggle_button.configure(relief='groove', command=lambda x = self.abs_rel_toggle_button : self.abs_rel_toggle_button_func(x))
             self.abs_rel_toggle_button.bind('<Enter>', lambda event, x=self.abs_rel_toggle_button : self.on_hover(x))
             self.abs_rel_toggle_button.bind('<Leave>', lambda event, x=self.abs_rel_toggle_button : self.on_hover_leave(x))
             self.abs_rel_toggle_button.place(anchor='n', relx=0.76, rely=y, relwidth=0.1, relheight=0.06)
         
-            self.zero_button = tk.Button(self.monitor_canvas, text='Zero', font=Helvetica_11_bold, bg=self.light_grey)
+            self.zero_button = tk.Button(self.monitor_canvas, text='Zero', font=Helvetica_11_bold, bg=self.colors["light grey"])
             self.zero_button.configure(relief='groove', command=lambda x = self.zero_button: self.zero_button_func(x))
             self.zero_button.bind('<Enter>', lambda event, x=self.zero_button : self.on_hover(x))
             self.zero_button.bind('<Leave>', lambda event, x=self.zero_button : self.on_hover_leave(x))
@@ -497,34 +442,34 @@ class Application(tk.Tk):
 
         self.start_stop_state = 'start'
             
-        self.start_stop_button = tk.Button(self.monitor_canvas, text='Start', font=Helvetica_11_bold, bg=self.light_grey,
+        self.start_stop_button = tk.Button(self.monitor_canvas, text='Start', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=lambda: self.start_stop_button_func())
         self.start_stop_button.bind('<Enter>', lambda event, x=self.start_stop_button : self.on_hover(x))
         self.start_stop_button.bind('<Leave>', lambda event, x=self.start_stop_button : self.on_hover_leave(x))
         self.start_stop_button.place(anchor='n', relx=0.48, rely=0.73, relwidth=0.17, relheight=0.07)
         
 
-        self.home_button = tk.Button(self.monitor_canvas, text='Home', font=Helvetica_11_bold, bg=self.light_grey,
+        self.home_button = tk.Button(self.monitor_canvas, text='Home', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=lambda: self.home_button_func())
         self.home_button.bind('<Enter>', lambda event, x=self.home_button : self.on_hover(x))
         self.home_button.bind('<Leave>', lambda event, x=self.home_button : self.on_hover_leave(x))
         self.home_button.place(anchor='n', relx=0.68, rely=0.73, relwidth=0.17, relheight=0.07)
 
-        self.servo_reset_button = tk.Button(self.monitor_canvas, text='Reset', font=Helvetica_11_bold, bg=self.light_grey,
+        self.servo_reset_button = tk.Button(self.monitor_canvas, text='Reset', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=self.servo_reset_button_func)
         self.servo_reset_button.bind('<Enter>', lambda event, x=self.servo_reset_button : self.on_hover(x))
         self.servo_reset_button.bind('<Leave>', lambda event, x=self.servo_reset_button : self.on_hover_leave(x))
         self.servo_reset_button.place(anchor='n', relx=0.88, rely=0.73, relwidth=0.17, relheight=0.07)
 
 
-        self.jog_plus_button = tk.Button(self.monitor_canvas, text='Jog +', font=Helvetica_11_bold, bg=self.light_grey, relief='groove')
+        self.jog_plus_button = tk.Button(self.monitor_canvas, text='Jog +', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.jog_plus_button.bind("<ButtonPress>", lambda event, parent=self.jog_plus_button: self.button_press(parent))
         self.jog_plus_button.bind("<ButtonRelease>", lambda event, parent=self.jog_plus_button: self.button_release(parent))
         self.jog_plus_button.bind('<Enter>', lambda event, x=self.jog_plus_button : self.on_hover(x))
         self.jog_plus_button.bind('<Leave>', lambda event, x=self.jog_plus_button : self.on_hover_leave(x))
         self.jog_plus_button.place(anchor='n', relx=0.28, rely=0.68, relwidth=0.17, relheight=0.07)
 
-        self.jog_minus_button = tk.Button(self.monitor_canvas, text='Jog -', font=Helvetica_11_bold, bg=self.light_grey, relief='groove')
+        self.jog_minus_button = tk.Button(self.monitor_canvas, text='Jog -', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.jog_minus_button.bind("<ButtonPress>", lambda event, parent=self.jog_minus_button: self.button_press(parent))
         self.jog_minus_button.bind("<ButtonRelease>", lambda event, parent=self.jog_minus_button: self.button_release(parent))
         self.jog_minus_button.bind('<Enter>', lambda event, x=self.jog_minus_button : self.on_hover(x))
@@ -532,16 +477,16 @@ class Application(tk.Tk):
         self.jog_minus_button.place(anchor='n', relx=0.28, rely=0.78, relwidth=0.17, relheight=0.07)
 
 
-        self.servo_speed_label = tk.Label(self.monitor_canvas, text='speed', font='Helvetica 10 bold', bg=self.light_color, relief='groove')
+        self.servo_speed_label = tk.Label(self.monitor_canvas, text='speed', font='Helvetica 10 bold', bg=self.colors["white"], relief='groove')
         self.servo_speed_label.place(anchor='n', relx=0.08, rely=0.63, relwidth=0.1, relheight=0.05)  
 
-        self.servo_speed_scale = tk.Scale(self.monitor_canvas, from_=0, to=100, tickinterval=100, orient='vertical', bg=self.light_grey, relief='groove')
+        self.servo_speed_scale = tk.Scale(self.monitor_canvas, from_=0, to=100, tickinterval=100, orient='vertical', bg=self.colors["light grey"], relief='groove')
         self.servo_speed_scale.set(self.default_servo_speed)
         self.servo_speed_scale.bind('<Enter>', lambda event, x=self.servo_speed_scale : self.on_hover(x))
         self.servo_speed_scale.bind('<Leave>', lambda event, x=self.servo_speed_scale : self.on_hover_leave(x))
         self.servo_speed_scale.place(anchor='n', relx=0.1, rely=0.675, relwidth=0.15, relheight=0.18)
 
-        self.logging_toggle_button = tk.Button(self.monitor_canvas, text='Record', font=Helvetica_11_bold, bg=self.light_grey, relief='groove')
+        self.logging_toggle_button = tk.Button(self.monitor_canvas, text='Record', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.logging_toggle_button.configure(command=self.logging_toggle_button_func)
         self.logging_toggle_button.bind('<Enter>', lambda event, x=self.logging_toggle_button : self.on_hover(x))
         self.logging_toggle_button.bind('<Leave>', lambda event, x=self.logging_toggle_button : self.on_hover_leave(x))
@@ -669,10 +614,10 @@ class Application(tk.Tk):
         if self.myserial.connect_state == 'Connected':
             if self.logging_toggle_button['text'] == 'Record':
                 self.logging_toggle_button['text'] = 'Stop Recording'
-                self.myserial.toggle_logging('on')
+                self.myserial.toggle_record('on')
             else:
                 self.logging_toggle_button['text'] = 'Record'
-                self.myserial.toggle_logging('off')
+                self.myserial.toggle_record('off')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')
 
@@ -687,35 +632,35 @@ class Application(tk.Tk):
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
-        self.parent_canvas = tk.Canvas(self.graph_tab, bg=self.light_color, relief='groove')
+        self.parent_canvas = tk.Canvas(self.graph_tab, bg=self.colors["white"], relief='groove')
         self.parent_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
         
         self.start_graph_button = tk.Button(self.parent_canvas, text='Start Graph', font=Helvetica_11_bold,
-            bg=self.light_grey, relief='groove', command=functools.partial(self.start_graph_button_func))
+            bg=self.colors["light grey"], relief='groove', command=functools.partial(self.start_graph_button_func))
         self.start_graph_button.bind('<Enter>', lambda event, x=self.start_graph_button : self.on_hover(x))
         self.start_graph_button.bind('<Leave>', lambda event, x=self.start_graph_button : self.on_hover_leave(x))
         self.start_graph_button.place(anchor='n', relx=0.77, rely=0.9, relwidth=0.22, relheight=0.07)
         
         self.clear_graph_button = tk.Button(self.parent_canvas, text='Clear Data', font=Helvetica_11_bold,
-            bg=self.light_grey, relief='groove', command=functools.partial(self.myserial.clear_data))
+            bg=self.colors["light grey"], relief='groove', command=functools.partial(self.myserial.clear_data))
         self.clear_graph_button.bind('<Enter>', lambda event, x=self.clear_graph_button : self.on_hover(x))
         self.clear_graph_button.bind('<Leave>', lambda event, x=self.clear_graph_button : self.on_hover_leave(x))
         self.clear_graph_button.place(anchor='n', relx=0.52, rely=0.9, relwidth=0.22, relheight=0.07)
 
         #USE PREFIXED COLORS FOR OUR VALUES SO NO LABELING IS NEEDING INSIDE THE GRAPH
-        self.roll_color_label = tk.Label(self.parent_canvas, text='Roll', fg='red', bg=self.light_color, font=Helvetica_11_bold)
+        self.roll_color_label = tk.Label(self.parent_canvas, text='Roll', fg='red', bg=self.colors["white"], font=Helvetica_11_bold)
         self.roll_color_label.place(anchor='n', relx=0.3, rely=0.01)
 
-        self.pitch_color_label = tk.Label(self.parent_canvas, text='Pitch', fg='blue', bg=self.light_color, font=Helvetica_11_bold)
+        self.pitch_color_label = tk.Label(self.parent_canvas, text='Pitch', fg='blue', bg=self.colors["white"], font=Helvetica_11_bold)
         self.pitch_color_label.place(anchor='n', relx=0.4, rely=0.01)
 
-        self.yaw_color_label = tk.Label(self.parent_canvas, text='Yaw', fg='green', bg=self.light_color, font=Helvetica_11_bold)
+        self.yaw_color_label = tk.Label(self.parent_canvas, text='Yaw', fg='green', bg=self.colors["white"], font=Helvetica_11_bold)
         self.yaw_color_label.place(anchor='n', relx=0.5, rely=0.01)
 
-        self.vane_color_label = tk.Label(self.parent_canvas, text='Vane', fg='purple', bg=self.light_color, font=Helvetica_11_bold)
+        self.vane_color_label = tk.Label(self.parent_canvas, text='Vane', fg='purple', bg=self.colors["white"], font=Helvetica_11_bold)
         self.vane_color_label.place(anchor='n', relx=0.6, rely=0.01)
 
-        self.wing_color_label = tk.Label(self.parent_canvas, text='Wing', fg='black', bg=self.light_color, font=Helvetica_11_bold)
+        self.wing_color_label = tk.Label(self.parent_canvas, text='Wing', fg='black', bg=self.colors["white"], font=Helvetica_11_bold)
         self.wing_color_label.place(anchor='n', relx=0.7, rely=0.01)
 
         self.graph_Separator = ttk.Separator(self.parent_canvas)
@@ -730,7 +675,7 @@ class Application(tk.Tk):
         self.ax = self.figure.add_subplot(111)
         self.ax.grid()
         self.show_coords_event = self.figure.canvas.mpl_connect('motion_notify_event', self.on_mouse_move_graph)
-        self.figure.set_facecolor(self.light_color)
+        self.figure.set_facecolor(self.colors["white"])
 
         self.annot = self.ax.annotate("", xy=(0,0), xytext=(-40,40),textcoords="offset points",
                     bbox=dict(boxstyle='round', fc='white', ec='k', lw=1),
@@ -811,13 +756,13 @@ class Application(tk.Tk):
         self.my3D_tab = ttk.Frame(self.tab_parent)
         self.tab_parent.add(self.my3D_tab, text='Real Time 3D')
 
-        self.my3D_canvas = tk.Canvas(self.my3D_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.black_color)
+        self.my3D_canvas = tk.Canvas(self.my3D_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["black"])
         self.my3D_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
         Helvetica_10_bold = tkFont.Font(family='Helvetica', size=10, weight='bold')
 
         self.tk_rpy_label = tk.Label(self.my3D_canvas, text='Connect to view real time 3D orientation of object', 
-            font=Helvetica_10_bold, bg=self.black_color, fg='white')
+            font=Helvetica_10_bold, bg=self.colors["black"], fg='white')
         self.tk_rpy_label.place(anchor='n', relx=0.5, rely=0.85, relwidth=0.7, relheight=0.05)
 
 
@@ -849,14 +794,14 @@ class Application(tk.Tk):
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
-        self.settings_canvas = tk.Canvas(self.settings_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.light_color, relief='groove')
+        self.settings_canvas = tk.Canvas(self.settings_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         self.settings_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
 
         self.settings_info_label = tk.Label(self.settings_canvas, text='< testing >', font=Helvetica_11_bold, justify='center', relief='groove')
         self.settings_info_label.place(anchor='n', relx=0.7, rely=0.02, relwidth=0.5, relheight=0.7)
 
-        self.gyro_calibration_button = tk.Button(self.settings_canvas, text='Start Gyro\nCalibration', font=Helvetica_11_bold, bg=self.light_grey,
+        self.gyro_calibration_button = tk.Button(self.settings_canvas, text='Start Gyro\nCalibration', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=self.gyro_calibration_button_func)
         self.gyro_calibration_button.bind('<Enter>', lambda event, x=self.gyro_calibration_button : self.on_hover(x))
         self.gyro_calibration_button.bind('<Leave>', lambda event, x=self.gyro_calibration_button : self.on_hover_leave(x))
@@ -864,14 +809,14 @@ class Application(tk.Tk):
 
 
         self.magnetometer_calibration_button = tk.Button(self.settings_canvas, text='Start Magnetometer\nCalibration', font=Helvetica_11_bold,
-            bg=self.light_grey, relief='groove', command=self.magnetometer_calibration_button_func)
+            bg=self.colors["light grey"], relief='groove', command=self.magnetometer_calibration_button_func)
         self.magnetometer_calibration_button.bind('<Enter>', lambda event, x=self.magnetometer_calibration_button : self.on_hover(x))
         self.magnetometer_calibration_button.bind('<Leave>', lambda event, x=self.magnetometer_calibration_button : self.on_hover_leave(x))
         self.magnetometer_calibration_button.place(anchor='n', relx=0.25, rely=0.2, relwidth=0.31, relheight=0.1)
 
 
         self.format_button = tk.Button(self.settings_canvas, text='Start Formatting\nSD Card', font=Helvetica_11_bold,
-            bg=self.light_grey, relief='groove', command=self.format_button_func)
+            bg=self.colors["light grey"], relief='groove', command=self.format_button_func)
         self.format_button.bind('<Enter>', lambda event, x=self.format_button : self.on_hover(x))
         self.format_button.bind('<Leave>', lambda event, x=self.format_button : self.on_hover_leave(x))
         self.format_button.place(anchor='n', relx=0.25, rely=0.35, relwidth=0.31, relheight=0.1)
@@ -916,10 +861,10 @@ class Application(tk.Tk):
         Helvetica_11 = tkFont.Font(family='Helvetica', size=11)
         Helvetica_12 = tkFont.Font(family='Helvetica', size=12)
 
-        self.about_canvas = tk.Canvas(self.about_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.light_color, relief='groove')
+        self.about_canvas = tk.Canvas(self.about_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         self.about_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
-        image = Image.open(self.logo_img_path)
+        image = Image.open('files\pictures-icon\invibit_logo.png')
         image = image.resize((250, 90), Image.ANTIALIAS)
         image = ImageTk.PhotoImage(image)
         self.about_canvas.create_image(self.WIDTH/2, 30, anchor='n', image=image) 
@@ -927,7 +872,7 @@ class Application(tk.Tk):
 
         # Text(master, height=1, borderwidth=0)
 
-        self.url = tk.Text(self.about_canvas, height=1, font=Helvetica_12, bg=self.light_color, borderwidth=0, cursor="hand2")
+        self.url = tk.Text(self.about_canvas, height=1, font=Helvetica_12, bg=self.colors["white"], borderwidth=0, cursor="hand2")
         self.url.bind('<Button-1>', lambda event, x=self.url: self.open_link(x))
         self.url.insert('1.0', 'https://www.invibit.com/')
         self.url.configure(state='disabled')
@@ -935,24 +880,24 @@ class Application(tk.Tk):
 
         contact_info_text = "phone: (+30) 210 4212380\nmail: info@invibit.com"
 
-        self.contact_info_label = tk.Text(self.about_canvas, height=1, font=Helvetica_11, borderwidth=0, bg=self.light_color)
+        self.contact_info_label = tk.Text(self.about_canvas, height=1, font=Helvetica_11, borderwidth=0, bg=self.colors["white"])
         self.contact_info_label.insert('1.0', contact_info_text)
         self.contact_info_label.configure(state='disabled')
         self.contact_info_label.place(anchor='n', relx=0.5, rely=0.38, relwidth=0.36, relheight=0.1)
 
-        self.creator_label = tk.Text(self.about_canvas, font=Helvetica_12, bg=self.light_color, borderwidth=0)
+        self.creator_label = tk.Text(self.about_canvas, font=Helvetica_12, bg=self.colors["white"], borderwidth=0)
         self.creator_label.insert('1.0', 'Tuning-GUI creator info:')
         self.creator_label.configure(state='disabled')
         self.creator_label.place(anchor='n', relx=0.5, rely=0.58, relwidth=0.35, relheight=0.1)
 
-        self.creator_info_label = tk.Text(self.about_canvas, font=Helvetica_11, bg=self.light_color, borderwidth=0)
+        self.creator_info_label = tk.Text(self.about_canvas, font=Helvetica_11, bg=self.colors["white"], borderwidth=0)
         self.creator_info_label.insert('1.0', 'Bill Brousalis\nbill.brousalis@gmail.com')
         self.creator_info_label.configure(state='disabled')
         self.creator_info_label.place(anchor='n', relx=0.5, rely=0.65, relwidth=0.35, relheight=0.1)
 
         
         # Firmware version at the bottom of the page
-        self.firmware_version_label = tk.Label(self.about_canvas, text='version : (connect to view firmware version)', bg=self.light_color, font=self.font +'11')
+        self.firmware_version_label = tk.Label(self.about_canvas, text='version : (connect to view firmware version)', bg=self.colors["white"], font=self.font +'11')
         self.firmware_version_label.place(anchor='n', relx=0.65, rely=0.93)
 
 
@@ -967,11 +912,11 @@ class Application(tk.Tk):
 
     #----------------------------------------------------------------------------------------------------------------
 
-    def on_hover(self, widget, highlight_color=highlight_color):
+    def on_hover(self, widget, highlight_color=colors["highlight"]):
         widget.configure(bg=highlight_color)
 
 
-    def on_hover_leave(self, widget, init_color=light_grey):
+    def on_hover_leave(self, widget, init_color=colors["light grey"]):
         widget.configure(bg=init_color)
 
 
@@ -1026,7 +971,7 @@ class Application(tk.Tk):
      
 
 
-
+    """
     # function updating the gui when 'vane/servo' tab is currently open
     def update_vane_gui(self):
         try:
@@ -1037,6 +982,7 @@ class Application(tk.Tk):
                     entry_wid.insert(0, tmp)
         except:
             print('update vane gui error...')
+    """
 
 
 
@@ -1169,7 +1115,7 @@ class Application(tk.Tk):
     # save the com port / baud rate last used inside the application
     # in order to retrieve them when re-opening the app
     def write_to_config(self):
-        with open(self.configFile, 'r+') as file:
+        with open('files\config.txt', 'r+') as file:
             lines = file.readlines()
             lines = [line.replace('\n', '') for line in lines]
             file.seek(0)

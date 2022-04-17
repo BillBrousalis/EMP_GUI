@@ -1,0 +1,67 @@
+making sense of it all:
+  * getting rid of 3d graphics (big cause of crashes)
+  * after its done look to POSSIBLY bring it back
+
+  * make serial_comms module NO-NONSENSE
+  * make additional modules to handle file stuff (if needed)
+
+  * create dictionaries to organize shit in gui
+  
+  * make it RESIZABLE
+
+  * 4 tabs (5 with the ABOUT tab)
+
+  tab Tuning:
+    simple enough, no need for constant updating (look at thanasis gui for reference)
+    add tuning with mouse wheel
+
+  tab Monitor:
+    run thread for the constant updating of values
+    fix huge space reserved for values -> ugly
+    make it prettier
+    layout needs to make more sense
+    add img to record button (OR use "*" symbol)
+    "speed" slider is ugly, make it larger (?)
+
+  tab graph:
+    same updating needed as the monitor tab, probably works fine
+
+  tab real-time-3d:
+    getting rid of this
+
+  tab advanced:
+    make commands work
+    make it pretty
+
+  tab About:
+    make it pretty
+
+
+  generic shit:
+    upon connecting to serial port successfully,
+    receive dump of current values and place them in the tuning tab
+
+
+    can crate error codes list to return back to the main gui if serial comm shit goes wrong
+    access error code dict to determine error and throw error message accordingly
+
+
+
+  thread management:
+    create thread upon entering tab monitor or graph
+    thread : while tab == monitor do ...
+            
+
+
+function to run after connecting to serial port:
+  if tab == tuning:
+    get_dump()
+  else if tab == monitor || tab == graph:
+    send command for monitor mode
+
+
+
+tuning tab problems:
+  have a way to iterate through the tuning values dict by entry id
+
+make error system cleaner - jesus this is cluttered

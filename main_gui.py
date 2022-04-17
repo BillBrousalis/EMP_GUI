@@ -17,13 +17,10 @@ import webbrowser
 
 #--------------------------------------------MODULES--------------------------------------------
 import serial_comms
-import orientation_graphics_3d as mygraphics
-
 
 #--------------------------------------------CREATING THE APPLICATION CLASS--------------------------------------------
 class Application(tk.Tk):
     #--------------------------------------------GENERIC VARIABLES - PATHS - WINDOW SIZE / COLORS--------------------------------------------
-    
     HEIGHT = 500
     WIDTH = 480
 
@@ -40,7 +37,8 @@ class Application(tk.Tk):
     graph_color_list = ['r','b', 'g', 'm', 'k']
 
     #---------------------DEFAULT / MIN / MAX VALUES OF ADJUSTABLE VARIABLES---------------------
-    # what the fuck is this for 
+
+    #****** what the fuck is this for 
     default_servo_speed = 50
 
     #--------------------------------------------INITIALIZING CLASS--------------------------------------------
@@ -48,16 +46,15 @@ class Application(tk.Tk):
         super().__init__()
         self.title("NAVI-TUNING")
         # add icon to the top left of the window
-        self.iconbitmap(default='files\\pictures-icon\\boat_icon.ico')
+        self.iconbitmap(default='files\pictures-icon\\boat_icon.ico')
 
         self.min_max_defaults_list = []
 
-        self.myserial = serial_comms.ser
-        self.myserial.refresh_ports()
+        self.s = serial_comms.SerialClass()
         self.setup3D_complete = False
         self.reading_thread = False
         self.create_GUI()
-        self.default_servo_speed = self.myserial.return_default_servo_speed()
+        self.default_servo_speed = self.s.return_default_servo_speed()
         self.servo_speed_scale.set(self.default_servo_speed)
  
 
@@ -75,24 +72,21 @@ class Application(tk.Tk):
         self.tab_parent = ttk.Notebook(self.mainFrame)
 
         self.tabs_to_be_updated = [1,2]
+        self.tabs = [{'name': 'Tuning', 'thread': False},
+                     {'name': 'Monitor', 'thread': True},
+                     {'name': 'Graphing', 'thread': True},
+                     {'name': 'Calibration', 'thread': False},
+                     {'name': 'About', 'thread': False}]
 
         self.create_tuning_tab()
         self.create_monitor_tab()                       
         self.create_graph_tab()
-        self.create_settings_tab()
+        self.create_calib_tab()
         self.create_about_tab()
 
         self.tab_parent.bind("<<NotebookTabChanged>>", self.on_tab_switch)
-        self.previous_tab = ''
+        self.previous_tab = None
         self.tab_parent.place(anchor='n', relx=0.5, rely=0.07, relwidth=1, relheight=0.93)
-
-        updateGUI_thread = threading.Thread(target=self.update_gui)
-        updateGUI_thread.daemon = True
-        updateGUI_thread.start()
-
-
-
-
 
 
         
@@ -107,9 +101,10 @@ class Application(tk.Tk):
         self.port_label.place(anchor='n', relx=0.1, rely=0.15, relwidth=0.15, relheight=0.7)
 
         self.com_port_var = tk.StringVar(self.serial_canvas)
-        self.com_port_var.set(self.myserial.default_com)
+        self.com_port_var.set(self.s.default_com)
 
-        self.com_port_menu = tk.OptionMenu(self.serial_canvas, self.com_port_var, *self.myserial.available_ports_list)
+        avail_ports = self.s.get_ports()
+        self.com_port_menu = tk.OptionMenu(self.serial_canvas, self.com_port_var, *avail_ports)
         self.com_port_menu.config(font=Helvetica_10_bold, bg=self.colors["light grey"], relief='groove')
         self.com_port_menu.place(anchor='n', relx=0.25, rely=0.155, relwidth=0.17, relheight=0.7)
 
@@ -120,12 +115,12 @@ class Application(tk.Tk):
         self.refresh_com_ports_button.place(anchor='n', relx=0.385, rely=0.205, relwidth=0.1, relheight=0.6)
 
         self.baud_rate_var = tk.StringVar(self.serial_canvas) 
-        self.baud_rate_var.set(str(self.myserial.default_baud))
+        self.baud_rate_var.set(str(self.s.default_baud))
 
         self.baud_label = tk.Label(self.serial_canvas, text='Baud Rate:', font=Helvetica_10_bold, bg=self.colors["light grey"])
         self.baud_label.place(anchor='n', relx=0.52, rely=0.15, relwidth=0.15, relheight=0.7)
 
-        self.baud_menu = tk.OptionMenu(self.serial_canvas, self.baud_rate_var, *self.myserial.baud_rate_list)
+        self.baud_menu = tk.OptionMenu(self.serial_canvas, self.baud_rate_var, *self.s.baud_rate_list)
         self.baud_menu.config(font=Helvetica_10_bold, bg=self.colors["light grey"], relief='groove')
         self.baud_menu.place(anchor='n', relx=0.68, rely=0.15, relwidth=0.17, relheight=0.7)
 
@@ -137,57 +132,66 @@ class Application(tk.Tk):
     #--------------------------------------------HANDLE SERIAL_GUI'S CONNECT BUTTON--------------------------------------------
     def connect_button_func(self):
         if self.connect_button['text'] == "Connect":
+            self.s.COM = self.com_port_var.get()          
+            self.s.BAUD = self.baud_rate_var.get()
+
+            self.s.connect()
             self.connect_button['text'] = "Close"
-            self.myserial.connect_func()
             time.sleep(0.01)
-            if self.myserial.connect_state == "Connected":
-                self.abs_rel_states_list = self.myserial.abs_rel_toggle_states
-                self.rel_zero_values_list = self.myserial.rel_zero_values_list
+            if self.s.connected:
+                self.abs_rel_states_list = self.s.abs_rel_toggle_states
+                self.rel_zero_values_list = self.s.rel_zero_values_list
                 self.update_rel_abs_button_text()
                 # SHOW VERSION ON SETTINGS TAB
-                self.firmware_version_label['text'] = f'version : {self.myserial.get_firmware_version()}'
+                self.firmware_version_label['text'] = f'version : {self.s.get_firmware_version()}'
                 # get first tab's values
-                self.update_vane_values()
-                if self.current_tab in self.tabs_to_be_updated:
-                    self.myserial.send_data("vmon 8 100\n")
+                self.update_tuning_values()
 
-                elif self.current_tab == 3:
-                    self.myserial.quat = True
-                    self.myserial.send_data("vmon 7 100\n")
+                if self.current_tab in self.tabs_to_be_updated:
+                    self.s.send("vmon 8 100")
+
+                self.handle_tabs()
             else:
                 self.connect_button['text'] = "Connect"
                 tkinter.messagebox.showinfo("Error", message="Error connecting to serial port")
 
-            if self.myserial.connect_state == "Connected":
-                self.read_serial_thread()
-            
-            if self.current_tab == 3:
-                self.setup3D()
-
         else:
+            if self.s.connected:
+                self.cleanup_serial()
+            # ******** move this somewhere else: handle tabs probably
             if self.start_graph_button['text'] == "Stop Graph":
                 self.start_graph_button_func()
             self.connect_button['text'] = "Connect"
-            self.myserial.send_data("vmon 0 0\n")
-            time.sleep(0.01)
-            self.myserial.connect_func()
-            
 
+    def cleanup_serial(self):
+        self.s.send("vmon 0 0")
+        time.sleep(0.01)
+        self.s.disconnect()
 
+    def handle_tabs(self):
+        if self.tabs[self.current_tab]["thread"]:
+            if self.s.connected:
+                self.s.send("vmon 8 100")
+                self.open_thread()
+
+    def open_thread(self):
+        if self.current_tab == 1:
+            self.monitor_thread = threading.Thread(target=self.monitor_thread_loop)
+            self.monitor_thread.daemon = True
+            self.monitor_thread.start()
+        elif self.current_tab == 2:
+            self.graph_thread = threading.Thread(target=self.animation_thread)
+            self.graph_thread.daemon = True
+            self.graph_thread.start()
 
 
     # handling the refresh button for the available ports
     def update_port_OptionMenu(self):     
-        self.myserial.refresh_ports()
+        avail_ports = self.s.get_ports()
         menu = self.com_port_menu.children['menu']
         menu.delete(0, 'end')
-        for port in self.myserial.available_ports_list:
+        for port in avail_ports:
             menu.add_command(label=port, command=lambda p=port: self.com_port_var.set(p))
-
-
-
-
-
 
 
 
@@ -198,56 +202,50 @@ class Application(tk.Tk):
         self.tuning_canvas = tk.Canvas(self.tuning_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         self.tuning_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
-
-        self.vane_values = dict()
-
         self.vane_entry_widgets_list = []
 
-        self.tuning_values = [{"text": "Offset :", "min": -20, "max": 20, "default": 0, "id": "voffs", "type": float},
-                              {"text": "Gain(Deg/Deg) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vgain", "type": float},
-                              {"text": "Vane Scale(Deg/V) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vscale", "type": float},
-                              {"text": "Delay(ms) :", "min": 0, "max": 2000, "default": 0, "id": "vdelay", "type": int},
-                              {"text": "Velocity :", "min": 0, "max": 5000000, "default": 0, "id": "vvel", "type": int},
-                              {"text": "Acceleration :", "min": 0, "max": 5000000, "default": 0, "id": "vacc", "type": int}, 
-                              {"text": "Kp :", "min": 0, "max": 32767, "default": 0, "id": "kp", "type": int},
-                              {"text": "Ki :", "min": 0, "max": 32767, "default": 0, "id": "ki", "type": int},
-                              {"text": "Kd :", "min": 0, "max": 32767, "default": 0, "id": "kd", "type": int},
-                              {"text": "Kv :", "min": 0, "max": 32767, "default": 0, "id": "kv", "type": int},
-                              {"text": "Power Limit(%) :", "min": 0, "max": 100, "default": 0, "id": "power", "type": int}]
+        self.tuning_values = [{"text": "Offset :", "min": -20, "max": 20, "default": 0, "id": "voffs", "step": 0.01},
+                              {"text": "Gain(Deg/Deg) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vgain", "step": 0.01},
+                              {"text": "Vane Scale(Deg/V) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vscale", "step": 0.01},
+                              {"text": "Delay(ms) :", "min": 0, "max": 2000, "default": 0, "id": "vdelay", "step": 1},
+                              {"text": "Velocity :", "min": 0, "max": 5000000, "default": 0, "id": "vvel", "step": 1},
+                              {"text": "Acceleration :", "min": 0, "max": 5000000, "default": 0, "id": "vacc", "step": 1}, 
+                              {"text": "Kp :", "min": 0, "max": 32767, "default": 0, "id": "kp", "step": 1},
+                              {"text": "Ki :", "min": 0, "max": 32767, "default": 0, "id": "ki", "step": 1},
+                              {"text": "Kd :", "min": 0, "max": 32767, "default": 0, "id": "kd", "step": 1},
+                              {"text": "Kv :", "min": 0, "max": 32767, "default": 0, "id": "kv", "step": 1},
+                              {"text": "Power Limit(%) :", "min": 0, "max": 100, "default": 0, "id": "power", "step": 1}]
 
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
-        #using a for loop to avoid massive block of repeating code
-        
-        #for i, (text, minimum, maximum, defaultval) in enumerate(zip(self.vane_text_list, self.min_values_list, self.max_values_list, self.default_values_list)):
         for i, config in enumerate(self.tuning_values): 
             y = (0.03+i*0.08)
             self.mylabel = tk.Label(self.tuning_canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.mylabel.place(anchor='n', relx=0.17, rely=y, relwidth=0.3, relheight=0.065)  
 
-            self.myentry = tk.Entry(self.tuning_canvas, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
-            self.myentry.insert(0, config["default"])
-            self.myentry.bind('<Return>', lambda event, x=self.myentry: self.on_enter_press(x))
-            self.myentry.bind('<Enter>', lambda event, x=self.myentry : self.on_hover(x))
-            self.myentry.bind('<Leave>', lambda event, x=self.myentry : self.on_hover_leave(x))
-            self.myentry.place(anchor='n', relx=0.54, rely=y+0.005, relwidth=0.42, relheight=0.055)
+            self.entry = tk.Entry(self.tuning_canvas, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
+
+            self.tuning_values[i]['entry'] = self.entry
+
+            self.entry.insert(0, config["default"])
+            self.entry.bind('<Return>', lambda event, x=i: self.on_enter_press(x))
+            self.entry.bind('<Enter>', lambda event, x=self.entry : self.on_hover(x))
+            self.entry.bind('<Leave>', lambda event, x=self.entry : self.on_hover_leave(x))
+            self.entry.place(anchor='n', relx=0.54, rely=y+0.005, relwidth=0.42, relheight=0.055)
 
             #append entry widget to a list of the vane/servo 's tab entry widgets ------ access individual widget by using self.vane_entry_widgets_list[i]
-            # ***** jesus christ no *****
-            self.vane_entry_widgets_list.append(self.myentry)
+            self.minus_but = tk.Button(self.tuning_canvas, text='-', font='Helvetica 14 bold', bg=self.colors["light grey"],
+                relief='groove', command=functools.partial(self.adjust_value, '-', i))
+            self.minus_but.bind('<Enter>', lambda event, x=self.minus_but : self.on_hover(x))
+            self.minus_but.bind('<Leave>', lambda event, x=self.minus_but : self.on_hover_leave(x))    
+            self.minus_but.place(anchor='n', relx=0.82, rely=y+0.005, relwidth=0.095, relheight=0.05)
 
-            self.mydownbutton = tk.Button(self.tuning_canvas, text='-', font='Helvetica 14 bold', bg=self.colors["light grey"],
-                relief='groove', command=functools.partial(self.adjust_value, 'down', self.myentry, config["min"], config["max"]))
-            self.mydownbutton.bind('<Enter>', lambda event, x=self.mydownbutton : self.on_hover(x))
-            self.mydownbutton.bind('<Leave>', lambda event, x=self.mydownbutton : self.on_hover_leave(x))    
-            self.mydownbutton.place(anchor='n', relx=0.82, rely=y+0.005, relwidth=0.095, relheight=0.05)
-
-            self.myupbutton = tk.Button(self.tuning_canvas, text='+', font='Helvetica 13 bold', bg=self.colors["light grey"],
-                relief='groove', command=functools.partial(self.adjust_value, 'up', self.myentry, config["min"], config["max"]))
-            self.myupbutton.bind('<Enter>', lambda event, x=self.myupbutton : self.on_hover(x))
-            self.myupbutton.bind('<Leave>', lambda event, x=self.myupbutton : self.on_hover_leave(x))
-            self.myupbutton.place(anchor='n', relx=0.92, rely=y+0.005, relwidth=0.095, relheight=0.05)
+            self.plus_but = tk.Button(self.tuning_canvas, text='+', font='Helvetica 13 bold', bg=self.colors["light grey"],
+                relief='groove', command=functools.partial(self.adjust_value, '+', i))
+            self.plus_but.bind('<Enter>', lambda event, x=self.plus_but : self.on_hover(x))
+            self.plus_but.bind('<Leave>', lambda event, x=self.plus_but : self.on_hover_leave(x))
+            self.plus_but.place(anchor='n', relx=0.92, rely=y+0.005, relwidth=0.095, relheight=0.05)
 
 
 
@@ -258,127 +256,93 @@ class Application(tk.Tk):
         self.save_button.bind('<Leave>', lambda event, x=self.save_button : self.on_hover_leave(x))
         self.save_button.place(anchor='n', relx=0.844, rely=0.92, relwidth=0.25, relheight=0.06)
 
-        # list of entries that require their value to remain an integer - store here for later use
-        self.int_entries = [self.vane_entry_widgets_list[i] for i in range(3,len(self.vane_entry_widgets_list))]
-        
-
-
 
 
     #--------------------------------------------SEND VALUE (ON ENTER PRESS) OF THE ENTRY WIDGET IN FOCUS--------------------------------------------
-    def on_enter_press(self, parent):
+    def on_enter_press(self, idx):
+        widget = self.tuning_values[idx]["entry"]
         #check if text is numeric:
-        if parent.get().replace('.', '').replace(' ', '').replace('-', '').isdigit():
-            #check if text is within bounds:
-            check = self.check_value_bounds()
-            if check: 
-                identifier = self.vane_entry_widgets_list.index(parent)
-                identifier = self.vane_id_list[identifier]
-                if parent in self.int_entries:
+        if widget.get().replace('.', '').replace(' ', '').replace('-', '').isdigit():
+            if self.check_bounds(): 
+                id = self.tuning_values[idx]["id"]
+                if self.tuning_values[idx]["step"] == 1:
                     try:
                         #check if given value is an integer
-                        int(parent.get())
-        # show error message if value is not : integer / in bounds / numeric
+                        int(widget.get())
+                    # show error message if value is not : integer / in bounds / numeric
                     except:
                         tk.messagebox.showinfo(title="Error", message="Value is not an integer.")
-                        return 0
-                self.myserial.send_data(f'{identifier}{parent.get()}\n')
+                        return None
+                self.s.send(f'{id} {widget.get()}')
                 time.sleep(0.05)
-                self.update_vane_values()
+                self.update_tuning_values()
             else:
                 tk.messagebox.showinfo(title="Error", message="Values are out of bounds.")    
         else:
             tk.messagebox.showinfo(title="Error", message="Values are not numeric.")
 
 
-
-    # update 'vane/servo' tab's values after using the 'dump1' command
-    def update_vane_values(self):
+    # update tuning tab's values after using the 'dump1' command
+    def update_tuning_values(self):
         try:
-            self.vane_values = self.myserial.receive_dump()
-            for key, entry in zip(self.vane_values, self.vane_entry_widgets_list):
-                val = self.vane_values[key]
-                val = str(val)
-                if " " in val: val = val.replace(" ", "")
-                entry.delete(0, 'end')
-                entry.insert(0, val)
+            fresh_dump = self.s.get_dump()
+            for idx, value_set in enumerate(fresh_dump.items()):
+                val = str(value_set[1]).strip().replace(" ", "")
+                print(val)
+                self.tuning_values[idx]["entry"].delete(0, 'end')
+                self.tuning_values[idx]["entry"].insert(0, val)
         except Exception as e:
-            print(f'error in update_vane_values : {e}')        
-
-
-
-
-
+            print(f'error in update_tuning_values : {e}')        
 
 
     # function handling the adjustment button of the 'vane/servo' tab
-    def adjust_value(self, direction, entry, min, max):
+    def adjust_value(self, sign, idx):
+        entry = self.tuning_values[idx]["entry"]
+        min, max = self.tuning_values[idx]["min"], self.tuning_values[idx]["max"]
+        step = self.tuning_values[idx]["step"]
+        val = entry.get()
         # validate that input is a number
         try:
-            assert entry.get().replace('.', '').replace('-', '').isdigit()
+            assert val.replace('.', '').replace('-', '').isdigit()
         except:
             tkinter.messagebox.showinfo(title="Error", message="Input is not a number.")
             raise Exception("Boo! Not a number...")
 
-        # for floating point entries
-        if entry not in self.int_entries:
-            val = float(entry.get())
-            if direction == 'up' and val<max:
-                val += 0.01
-            elif direction == 'down' and val>min:
-                val -= 0.01
-            if val > max:
-                val = max
-            elif val < min:
-                val = min
-            val = '{:.2f}'.format(val)
+        if step != 1: val = float(val)
+        else: val = int(val)
 
-        # for integer-only entries
-        else:
-            # flooring the value
-            val = int(float(entry.get()))         
-            if direction == 'up' and val < max:
-                val += 1
-            elif direction == 'down' and val > min:
-                val -= 1
-            if val > max:
-                val = max
-            elif val < min:
-                val = min
-            val = str(val)
+        if sign == "+": 
+            val += step
+        else: 
+            val -= step
 
-        if self.myserial.connect_state == "Connected":
-            index = self.vane_entry_widgets_list.index(entry)
-            identifier = self.vane_id_list[index]
-            self.myserial.send_data(f'{identifier}{val.strip()}\n')
-            time.sleep(0.01)
-            self.update_vane_values()
+        if val > max: val = max
+        elif val < min: val = min
+        
+        if step != 1: val = '{:.2f}'.format(val)
+        val = str(val)
+        if self.s.connected:
+            self.s.send(f'{self.tuning_values[idx]["id"]} {val.strip()}')
+            self.update_tuning_values()
         else:
             print("not connected")
 
 
-
     # handling the 'save' button function
     def save_values(self):
-        if self.myserial.connect_state == "Connected":
-            self.myserial.send_data("save\n")
+        if self.s.connected:
+            self.s.send("save")
         else:
             tkinter.messagebox.showinfo(title="Error", message="You are not connected to a serial port.")
 
 
-
-
     # determining if given values are inside their min/max bounds
-    def check_value_bounds(self):
-        for val, minim, maxim in zip(self.vane_entry_widgets_list, self.min_values_list, self.max_values_list):
-            val = float(val.get())
-            if val > maxim or val < minim:
+    def check_bounds(self):
+        for widget in self.tuning_values:
+            val = float(widget["entry"].get())
+            if val < widget["min"] or val > widget["max"]:
                 return False
         return True
-
-
-
-
 
 
 
@@ -392,6 +356,11 @@ class Application(tk.Tk):
         self.monitor_canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         self.monitor_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
+        self.monitor_values = [{"text": "Roll :", "default": 0},
+                               {"text": "Pitch :", "default": 0},
+                               {"text": "Yaw :", "default": 0},
+                               {"text": "Vane :", "default": 0},
+                               {"text": "Wing :", "default": 0}]
 
         self.monitor_text_list = ['Roll :', 'Pitch :', 'Yaw :', 'Vane :', 'Wing :']
         self.monitor_label_list = []
@@ -402,15 +371,13 @@ class Application(tk.Tk):
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
         #--------------------------------------------AGAIN USING A FOR LOOP TO AVOID BIG BLOCK OF REPEATING CODE--------------------------------------------
-        
-        for i, text in enumerate(self.monitor_text_list):
+        for i, config in enumerate(self.monitor_values):
             y = (0.05+i*0.11)
-            defaultval = '0.00'
-            self.monitor_label = tk.Label(self.monitor_canvas, text=text, font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
+            self.monitor_label = tk.Label(self.monitor_canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.monitor_label.place(anchor='n', relx=0.13, rely=y, relwidth=0.11, relheight=0.06)  
             self.monitor_label_list.append(self.monitor_label)
 
-            self.monitor_value_label = tk.Label(self.monitor_canvas, text=defaultval, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
+            self.monitor_value_label = tk.Label(self.monitor_canvas, text=str(config["default"]), font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
             self.monitor_value_label.place(anchor='n', relx=0.45, rely=y, relwidth=0.45, relheight=0.06)
 
             # like the vane/servo tab, store the monitor tab's label widgets in a list to access them individually with ease 
@@ -487,7 +454,7 @@ class Application(tk.Tk):
         self.servo_speed_scale.place(anchor='n', relx=0.1, rely=0.675, relwidth=0.15, relheight=0.18)
 
         self.logging_toggle_button = tk.Button(self.monitor_canvas, text='Record', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
-        self.logging_toggle_button.configure(command=self.logging_toggle_button_func)
+        self.logging_toggle_button.configure(command=self.record_toggle_but_func)
         self.logging_toggle_button.bind('<Enter>', lambda event, x=self.logging_toggle_button : self.on_hover(x))
         self.logging_toggle_button.bind('<Leave>', lambda event, x=self.logging_toggle_button : self.on_hover_leave(x))
         self.logging_toggle_button.place(anchor='n', relx=0.813, rely=0.85, relwidth=0.3, relheight=0.07)
@@ -499,7 +466,7 @@ class Application(tk.Tk):
     def button_press(self, parent):
         print("pressed")
         self.button_is_pressed = True
-        if self.myserial.connect_state == "Connected":
+        if self.s.connected:
             if parent == self.jog_plus_button:
                 self.jog_plus_button_func()
             elif parent == self.jog_minus_button:
@@ -510,7 +477,7 @@ class Application(tk.Tk):
     def button_release(self, parent):
         print("released")
         self.button_is_pressed = False
-        if self.myserial.connect_state == "Connected":
+        if self.s.connected:
             if parent == self.jog_plus_button:
                 self.jog_plus_button_func()
             elif parent == self.jog_minus_button:
@@ -522,21 +489,21 @@ class Application(tk.Tk):
     def jog_plus_button_func(self):
         if self.button_is_pressed:
             speed = self.servo_speed_scale.get()
-            self.myserial.send_data(f'jog 1 {speed}\n')
+            self.s.send(f'jog 1 {speed}')
         else:
-            self.myserial.send_data('srvstop\n')
+            self.s.send('srvstop')
         time.sleep(0.05)
-        self.myserial.send_data('vmon 8 100\n')
+        self.s.send('vmon 8 100')
 
     
     def jog_minus_button_func(self):
         if self.button_is_pressed:
             speed = self.servo_speed_scale.get()
-            self.myserial.send_data(f'jog 0 {speed}\n')
+            self.s.send(f'jog 0 {speed}')
         else:
-            self.myserial.send_data('srvstop\n')
+            self.s.send('srvstop')
         time.sleep(0.05)
-        self.myserial.send_data('vmon 8 100\n')
+        self.s.send('vmon 8 100')
     
         
 
@@ -545,44 +512,44 @@ class Application(tk.Tk):
 
     # handling the 'home' button function
     def home_button_func(self):
-        if self.myserial.connect_state == "Connected":
-            self.myserial.send_data('home\n')
+        if self.s.connected:
+            self.s.send('home')
             time.sleep(0.05)
-            self.myserial.send_data('vmon 8 100\n')
+            self.s.send('vmon 8 100')
         else:
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
 
     # handling the start / stop button function - keeping track of its state
     def start_stop_button_func(self):
-        if self.myserial.connect_state == "Connected":
+        if self.s.connected:
             if self.start_stop_state == 'start':
                 self.start_stop_state = 'stop'
                 self.start_stop_button['text'] = 'Stop'
-                self.myserial.send_data('start\n')
+                self.s.send('start')
             else:
                 self.start_stop_state = 'start'
                 self.start_stop_button['text'] = 'Start'
-                self.myserial.send_data('stop\n')
+                self.s.send('stop')
             time.sleep(0.05)
-            self.myserial.send_data('vmon 8 100\n')
+            self.s.send('vmon 8 100')
         else:
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
 
     # handling the 'servo reset' button function
     def servo_reset_button_func(self):
-        if self.myserial.connect_state == "Connected":
-            self.myserial.send_data('srvreset\n')
+        if self.s.connected:
+            self.s.send('srvreset')
             time.sleep(0.05)
-            self.myserial.send_data('vmon 8 100\n')
+            self.s.send('vmon 8 100')
         else:
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
 
     
     def abs_rel_toggle_button_func(self, button):
-        if self.myserial.connect_state == 'Connected':
+        if self.s.connected:
             button_index = self.abs_rel_toggle_buttons_list.index(button)
             current_state = button['text']
             if current_state == 'Abs':
@@ -595,7 +562,7 @@ class Application(tk.Tk):
 
 
     def zero_button_func(self, button):
-        if self.myserial.connect_state == 'Connected':
+        if self.s.connected:
             button_index = self.zero_buttons_list.index(button)
             if self.abs_rel_states_list[button_index] == 'Abs':
                 self.rel_zero_values_list[button_index] = float('{:.2f}'.format(float(self.monitor_value_label_list[button_index]['text'])))
@@ -610,14 +577,14 @@ class Application(tk.Tk):
             button['text'] = self.abs_rel_states_list[index]
 
 
-    def logging_toggle_button_func(self):
-        if self.myserial.connect_state == 'Connected':
+    def record_toggle_but_func(self):
+        if self.s.connected:
             if self.logging_toggle_button['text'] == 'Record':
                 self.logging_toggle_button['text'] = 'Stop Recording'
-                self.myserial.toggle_record('on')
+                self.s.toggle_record('on')
             else:
                 self.logging_toggle_button['text'] = 'Record'
-                self.myserial.toggle_record('off')
+                self.s.toggle_record('off')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')
 
@@ -626,7 +593,7 @@ class Application(tk.Tk):
 
     #--------------------------------------------CREATING THE 'GRAPH' TAB USING MATPLOTLIB FIGURES--------------------------------------------
     def create_graph_tab(self):
-        self.graph_data = self.myserial.data
+        self.graph_data = self.s.data
         self.graph_tab = ttk.Frame(self.tab_parent)
         self.tab_parent.add(self.graph_tab, text='Graph')
 
@@ -642,7 +609,7 @@ class Application(tk.Tk):
         self.start_graph_button.place(anchor='n', relx=0.77, rely=0.9, relwidth=0.22, relheight=0.07)
         
         self.clear_graph_button = tk.Button(self.parent_canvas, text='Clear Data', font=Helvetica_11_bold,
-            bg=self.colors["light grey"], relief='groove', command=functools.partial(self.myserial.clear_data))
+            bg=self.colors["light grey"], relief='groove', command=functools.partial(self.s.clear_data))
         self.clear_graph_button.bind('<Enter>', lambda event, x=self.clear_graph_button : self.on_hover(x))
         self.clear_graph_button.bind('<Leave>', lambda event, x=self.clear_graph_button : self.on_hover_leave(x))
         self.clear_graph_button.place(anchor='n', relx=0.52, rely=0.9, relwidth=0.22, relheight=0.07)
@@ -700,13 +667,10 @@ class Application(tk.Tk):
         self.figure.canvas.draw()
         time.sleep(0.005)
 
-
-
-
     
     #HANDLE THE 'START/STOP GRAPH' BUTTON
     def start_graph_button_func(self):
-        if self.myserial.connect_state == 'Connected':
+        if self.s.connected:
             if self.start_graph_button['text'] == 'Start Graph':
                 self.start_graph_button['text'] = 'Stop Graph'
                 try:
@@ -767,30 +731,13 @@ class Application(tk.Tk):
 
 
 
-    # setting up the graphics
-    def setup3D(self):
-        #if object hasn't been created yet
-        if self.setup3D_complete == False:
-            self.myobject = mygraphics.ObjectClass(self, self.my3D_canvas, self.WIDTH, self.HEIGHT)
-            self.setup3D_complete = True
-            self.myobject.main()
-
-            self.update_3D_gui()
-        else:
-            # re-use already existing object
-            self.myobject.update3d()
-
-        
-
-
-
 
 
 
 #--------------------------------------------CREATING THE 'SETTINGS' TAB --------------------------------------------
-    def create_settings_tab(self):
+    def create_calib_tab(self):
         self.settings_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.settings_tab, text='Advanced')
+        self.tab_parent.add(self.settings_tab, text='Calibrate')
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
@@ -825,28 +772,28 @@ class Application(tk.Tk):
        
 
     def gyro_calibration_button_func(self):
-        if self.myserial.connect_state == "Connected":
+        if self.s.connected:
             yes_no_msg = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the gyro sensor.\nAre you sure?')
             if yes_no_msg == 'yes':
-                self.myserial.send_data('acccal\n')
+                self.s.send('acccal')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')    
     
 
     def magnetometer_calibration_button_func(self):
-        if self.myserial.connect_state == "Connected":
+        if self.s.connected:
             yes_no_msg = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the magnetometer sensor.\nAre you sure?')
             if yes_no_msg == 'yes':
-                self.myserial.send_data('magcal\n')
+                self.s.send('magcal')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')  
     
 
     def format_button_func(self):
-        if self.myserial.connect_state == "Connected":
+        if self.s.connected:
             yes_no_msg = tk.messagebox.askquestion(title='WARNING', message='You are about to format the SD card.\nAre you sure?')
             if yes_no_msg == 'yes':
-                self.myserial.send_data('format\n')
+                self.s.send('format')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')  
 
@@ -930,8 +877,8 @@ class Application(tk.Tk):
 
     #function checking connection state and using serialComms module to receive data
     def read_serial(self):
-        while self.myserial.connect_state == "Connected" and self.myserial.quat == False and self.current_tab in self.tabs_to_be_updated:
-            self.myserial.receive_data()
+        while self.s.connected and self.s.quat == False and self.current_tab in self.tabs_to_be_updated:
+            self.s.recv()
             time.sleep(0.0001)
             self.reading_thread = True
         self.reading_thread = False
@@ -944,53 +891,13 @@ class Application(tk.Tk):
             print('waiting for thread to close...')
 
 
-
-
-
-    #generic update gui function running in a thread - calling individual update functions depending on current tab
-    def update_gui(self):
-        while True:
-            self.myserial.COM = self.com_port_var.get()          
-            self.myserial.BAUD = self.baud_rate_var.get()
-
-            #current tab : 0 > vane/servo , 1 > monitor, 2 > graph  3 > 3D, 4 > about
-            self.current_tab = self.tab_parent.index(self.tab_parent.select()) 
-            if self.current_tab == 0:
-                self.update_vane_gui()
-                time.sleep(0.2)
-            if self.current_tab == 1:
-                self.update_monitor_gui()
-                time.sleep(0.1)
-            elif self.current_tab == 3:
-                if self.myserial.connect_state == "Connected" and self.myserial.quat == True:
-                    self.update_3D_gui()
-                    time.sleep(0.1)
-            else:
-                time.sleep(0.05)
-           
-     
-
-
-    """
-    # function updating the gui when 'vane/servo' tab is currently open
-    def update_vane_gui(self):
-        try:
-            for entry_wid in self.vane_entry_widgets_list:
-                if ' ' in entry_wid.get():
-                    tmp = entry_wid.get().replace(' ', '')
-                    entry_wid.delete(0, 'end')
-                    entry_wid.insert(0, tmp)
-        except:
-            print('update vane gui error...')
-    """
-
-
-
     # function updating the gui when 'monitor' tab is currently open
-    def update_monitor_gui(self):
-        if self.myserial.connect_state == "Connected" and self.myserial.quat == False:
+    # ********* check out if REL / ABS / ZERO stuff still works - doubt it
+    def monitor_thread_loop(self):
+        while self.s.connected and self.current_tab == 1:
             try:             
-                graph_data = self.myserial.return_graph_data()
+                self.s.recv(collect=True)
+                graph_data = self.s.return_graph_data()
                 values = [item[len(item)-1] for item in graph_data]    
                 for index, (val_label, value) in enumerate(zip(self.monitor_value_label_list, values)):
                     if index == 4:
@@ -1005,8 +912,6 @@ class Application(tk.Tk):
                         val_label['text'] = str(round(value - self.rel_zero_values_list[index], 2))
             except:
                 print('error on update_monitor_gui...')
-        else:
-            pass
 
 
 
@@ -1017,11 +922,11 @@ class Application(tk.Tk):
         self.ax.clear()
         try:
             # either plot or read serial, not both at the same time / avoid crashes
-            while self.myserial.is_reading_serial == True:
+            while self.s.is_reading_serial == True:
                 time.sleep(0.001)
 
-            graph_data = self.myserial.return_graph_data()
-            t_count_array = list(self.myserial.return_t_count_array())
+            graph_data = self.s.return_graph_data()
+            t_count_array = list(self.s.return_t_count_array())
             # plot the values
             for i, item in enumerate(graph_data):
                 self.ax.plot(t_count_array, item, self.graph_color_list[i])
@@ -1031,74 +936,27 @@ class Application(tk.Tk):
             print(f'update_graph_gui exception : {e}')
  
 
-
-
-    # function updating the gui when '3D' tab is currently open
-    def update_3D_gui(self):
-        try:
-            # write roll pitch yaw values on screen
-            self.tk_rpy_label['text'] = "Roll: {:.2f}  ||  Pitch: {:.2f}  ||  Yaw: {:.2f}".format(self.myobject.tk_roll,
-                self.myobject.tk_pitch, self.myobject.tk_yaw)
-        except Exception as e:
-            print(f"update_3D_gui exception : {e}")
-  
-            
-
-
-
-
     # FUNCTION CALLED EVERY TIME THE USER SWITCHES TABS - KEEPS TRACK OF CURRENT AND PREVIOUS TAB,
     # SENDING APPROPRIATE VMON COMMAND TO DISPLAY CORRECT VALUES DEPENING ON THE CURRENT TAB 
     def on_tab_switch(self, event):
         try:
             self.current_tab = self.tab_parent.index(self.tab_parent.select())
-            # THE 4TH (3RD COUNTING FROM 0) TAB IS THE '3D' TAB
-            # IT REQUIRES SPECIAL ATTENTION, NEEDS TO SEND "VMON 7 100"  
-            # UPON SWITCHING TO IT IN ORDER TO RECEIVE THE QUATERNION DATA IT EXPECTS
 
-            # if previous tab is the 3D tab, switch to non quaternion data
-            if self.previous_tab == 3:
-                self.wait_for_thread_to_close()
-                self.myserial.quat = False
-
-            # Close graphing when switching to another tab / avoid crashes
-            if self.previous_tab == 2 and self.current_tab != 2:
-                if self.start_graph_button['text'] == 'Stop Graph':
-                    self.start_graph_button_func()
-
-            # if the current tab is the 3D tab, switch to quaternion data
-            if self.current_tab == 3:
-                self.wait_for_thread_to_close()
-                self.myserial.send_data("vmon 7 100\n")
-                self.myserial.quat = True
-
-                #>>>> following not needed anymore (?)
-                # for some reason, if current tab = 3, it doesn't reach the end of 
-                # the function where we do the following assignment, so this is a quick and dirty fix:
-                self.previous_tab = self.current_tab
-
-                #call setup function to handle 3D
-                self.setup3D()
-            
             # arriving in an updating tab, coming from a non updating one > request data
-            elif (self.current_tab in self.tabs_to_be_updated) and (self.previous_tab not in self.tabs_to_be_updated):
-                self.myserial.send_data("vmon 8 100\n")
+            if self.current_tab in [1, 2] and self.previous_tab not in [1, 2]:
+                if self.s.connected:
+                    self.s.send("vmon 8 100")
                 time.sleep(0.05)
-                self.read_serial_thread()
-
-            # moving from and updating tab to another updating tab > change nothing                    
-            # dont remove this, needed so it doesn't fall into the next <else>
-            elif (self.current_tab in self.tabs_to_be_updated) and (self.previous_tab in self.tabs_to_be_updated):
-                pass
-            # arriving on the first tab, receive dump containing current values / variables
-            elif self.current_tab == 0:
-                self.wait_for_thread_to_close()
-                self.myserial.quat = False
-                self.myserial.receive_dump()
+                self.handle_tabs()
             # arriving on non updating-static tab
-            else:
+            elif self.current_tab in [0, 3, 4]:
                 self.wait_for_thread_to_close()
-                self.myserial.send_data('vmon 0 0\n')
+                self.s.send('vmon 0 0')
+
+            if self.current_tab == 0:
+                self.wait_for_thread_to_close()
+                self.update_tuning_values()
+
             # update previous tab to current tab on tab switch
             self.previous_tab = self.current_tab
         except:
@@ -1135,15 +993,10 @@ class Application(tk.Tk):
     # run upon exiting the app - handle serial connection
     # run the write_to_config function to save
     def exit(self):
-        self.myserial.send_data("vmon 0 0\n")
-        self.myserial.close_csv()
+        self.cleanup_serial()
         self.write_to_config()
-        self.myserial.connect_state = "Not Connected"
         self.quit()
         self.destroy()
-
-
-
 
 
 #-------------------------MAIN - RUN APP-------------------------

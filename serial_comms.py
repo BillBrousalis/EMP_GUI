@@ -1,19 +1,14 @@
-
 #------------------------------------------IMPORTS------------------------------------------
 import time
 import serial
 import json
 from collections import deque
 from datetime import datetime
-import timeit
 
 #------------------------------------------CREATING SERIAL CLASS------------------------------------------
 class SerialClass():
     #------------------------------------------generic variables------------------------------------------
-    available_ports_list = []
-    
     default_servo_speed = 50
-
     x_limit = 50    # seconds to display in the X axis
     
     #------------------------------------------INITIALIZING------------------------------------------
@@ -23,12 +18,7 @@ class SerialClass():
         self.baud_rate_list = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 76800, 115200]
         self.COM = 'COM16'
         self.BAUD = self.baud_rate_list[-1]
-        #since app opens with a non-quaternion tab as its first tab, we have quat set to false by default
-        self.quat = False
 
-        self.write_batch_size = 10
-        self.logging = False
-        
         self.time_start = time.time()
 
         self.csv_data_batch = deque()
@@ -42,7 +32,7 @@ class SerialClass():
         self.data = deque()
         self.t_count_array = deque()
         self.number_of_graph_values = 5
-        self.graph_data = [[] for i in range(self.number_of_graph_values)]
+        self.graph_data = [[] for i in range(5)]
         self.is_reading_serial = False
 
 
@@ -92,7 +82,7 @@ class SerialClass():
 
     # handle the connect function of the serial connection
     # keep track and change the connection state
-    def connect_func(self):
+    def connect(self):
         if self.connected == False:
             try:
                 self.ser = serial.Serial(self.COM, self.BAUD, timeout=2)
@@ -105,11 +95,21 @@ class SerialClass():
             self.ser.close()
             self.connected = False
             print("Closing serial connection with port", self.COM)
+
+    def disconnect(self):
+        if self.connected:
+            self.ser.close()
+            self.connected = False
+        else:
+            print('not connected (disconnect func)')
+
         
 
     # used to send data through the serial port
-    def send(self, dat):
-        if self.connected == True and self.ser != None:
+    def send(self, dat, LF=True):
+        if self.connected:
+            if LF: 
+                dat = f'{dat}\n'
             try:
                 self.ser.write(dat.encode())
                 print(f"SENDING... : '{dat}'")     
@@ -120,16 +120,17 @@ class SerialClass():
 
 
 
-    def receive(self, json=True):
+    def recv(self, isjson=True, collect=False):
         if self.connected:
             try:
                 rec = self.ser.readline().decode()
-                if json:
-                    return json.loads(rec)
+                if isjson:
+                    rec = json.loads(rec)
+                if collect:
+                    self.collect_data(rec)
                 return rec
             except:
                 print('error in receive')
-        
         else:
             print('Not connected')
 
@@ -159,28 +160,27 @@ class SerialClass():
 
     # if quat is false, collect data in an organized matter for 
     # use in the 'monitor' tab as well as the graph
-    def collect_data(self):
-            if self.t_count >= 100:
-                self.t_count = 0
+    def collect_data(self, dat):
+        if self.t_count >= 100:
+            self.t_count = 0
 
-            self.t_count += 0.1
-            
-            if len(self.data) >= self.x_limit:
-                self.data.popleft()
-                self.t_count_array.popleft()
-            
-            self.data.append(self.received["md8"])
-            self.t_count_array.append(self.t_count)
+        self.t_count += 0.1
+        
+        if len(self.data) >= self.x_limit:
+            self.data.popleft()
+            self.t_count_array.popleft()
+         
+        self.data.append(dat["md8"])
+        self.t_count_array.append(self.t_count)
 
-            item = self.data[-1]
-            
-            if item != None:
-                for index, value in enumerate(item):
-                    if len(self.graph_data[index]) >= self.x_limit:
-                        self.graph_data[index].pop(0)
-                    self.graph_data[index].append(value)
-            
-            self.is_reading_serial = False
+        item = self.data[-1]
+        
+        if item != None:
+            for index, value in enumerate(item):
+                if len(self.graph_data[index]) >= self.x_limit:
+                    self.graph_data[index].pop(0)
+                self.graph_data[index].append(value)
+        self.is_reading_serial = False
 
 
 
@@ -188,9 +188,9 @@ class SerialClass():
     def toggle_record(self, state):
         if self.connected == True:
             if state == 'on':
-                self.send_data("recstart\n")
+                self.send("recstart")
             else:
-                self.send_data("recstop\n")
+                self.send("recstop")
     
              
 
@@ -222,7 +222,7 @@ class SerialClass():
 
 
     # check for avaiable ports
-    def refresh_ports(self):
+    def get_ports(self):
         avail_ports = []
         for i in range(1,32):
             com = f'COM{i}'
@@ -239,45 +239,38 @@ class SerialClass():
 
     def get_dump(self):
         if self.connected:
-            dump = ''
-            while dump == '':
-                self.send("dump1\n")
-                dump = self.receive(json=False)
+            while True:
+                self.send("dump1")
+                dump = self.recv(isjson=False)
                 try:
                     dump = json.loads(dump)
                 except:
-                    dump = ''
                     print('not valid json in receive dump...')
                     time.sleep(0.05)
                 if 'offs' in dump:
                     return dump
-                else:
-                    dump = ''
 
 
+    # fix this shit
     def get_firmware_version(self):
-        try:
-            if self.connected:
-                self.send_data('vers\n')
+        if self.connected:
+            try:
+                self.send('vers')
                 time.sleep(0.05)
                 self.serialFlush()
                 version = self.ser.read_all().decode()
                 print(f'version = {version}')
                 if 'version' in version:
                     version = json.loads(version)
-                    return version['version']
+                    return version["version"]
                 else:
                     while 'version' not in version:
                         print('retrying to get correct firmware version')
                         version = self.ser.readline().decode()
                         time.sleep(0.001)
                     version = json.loads(version)
-            else:
-                return '*error in getting firmware version*'
-        except Exception as e:
-            print(f"get_firmware_version error : {e}")
-
-
-
-# create ser object to be used both by the mainGUI as well as the 3D graphics module
-ser = SerialClass()
+                    return version["version"]
+            except Exception as e:
+                print(f"get_firmware_version error : {e}")
+        else:
+            return '*error in getting firmware version*'

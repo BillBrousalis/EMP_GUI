@@ -101,7 +101,7 @@ class Application(tk.Tk):
         self.port_label.place(anchor='n', relx=0.1, rely=0.15, relwidth=0.15, relheight=0.7)
 
         self.com_port_var = tk.StringVar(self.serial_canvas)
-        self.com_port_var.set(self.s.default_com)
+        self.com_port_var.set(self.s.COM)
 
         avail_ports = self.s.get_ports()
         self.com_port_menu = tk.OptionMenu(self.serial_canvas, self.com_port_var, *avail_ports)
@@ -115,7 +115,7 @@ class Application(tk.Tk):
         self.refresh_com_ports_button.place(anchor='n', relx=0.385, rely=0.205, relwidth=0.1, relheight=0.6)
 
         self.baud_rate_var = tk.StringVar(self.serial_canvas) 
-        self.baud_rate_var.set(str(self.s.default_baud))
+        self.baud_rate_var.set(str(self.s.BAUD))
 
         self.baud_label = tk.Label(self.serial_canvas, text='Baud Rate:', font=Helvetica_10_bold, bg=self.colors["light grey"])
         self.baud_label.place(anchor='n', relx=0.52, rely=0.15, relwidth=0.15, relheight=0.7)
@@ -353,11 +353,14 @@ class Application(tk.Tk):
         self.monitor_canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         self.monitor_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
-        self.monitor_values = [{"text": "Roll :", "default": 0},
-                               {"text": "Pitch :", "default": 0},
-                               {"text": "Yaw :", "default": 0},
-                               {"text": "Vane :", "default": 0},
-                               {"text": "Wing :", "default": 0}]
+        self.monitor_values = [{"val": None, "text": "Roll :", "default": 0, "widget": None, "zero-rel-val": None},
+                               {"val": None, "text": "Pitch :", "default": 0, "widget": None, "zero-rel-val": None},
+                               {"val": None, "text": "Yaw :", "default": 0, "widget": None, "zero-rel-val": None},
+                               {"val": None, "text": "Vane :", "default": 0, "widget": None, "zero-rel-val": None},
+                               {"val": None, "text": "Wing :", "default": 0, "widget": None, "zero-rel-val": None}]
+        
+        self.monitor_buttons = [{"abs-rel": None, "toggle-state": None, "zero": None}  for _ in range(5)]
+        
 
         self.monitor_text_list = ['Roll :', 'Pitch :', 'Yaw :', 'Vane :', 'Wing :']
         self.monitor_label_list = []
@@ -376,6 +379,7 @@ class Application(tk.Tk):
 
             self.monitor_value_label = tk.Label(self.monitor_canvas, text=str(config["default"]), font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
             self.monitor_value_label.place(anchor='n', relx=0.45, rely=y, relwidth=0.45, relheight=0.06)
+            self.monitor_values[i]["widget"] = self.monitor_value_label
 
             # like the vane/servo tab, store the monitor tab's label widgets in a list to access them individually with ease 
             self.monitor_value_label_list.append(self.monitor_value_label)
@@ -385,18 +389,20 @@ class Application(tk.Tk):
             self.abs_rel_toggle_button.bind('<Enter>', lambda event, x=self.abs_rel_toggle_button : self.on_hover(x))
             self.abs_rel_toggle_button.bind('<Leave>', lambda event, x=self.abs_rel_toggle_button : self.on_hover_leave(x))
             self.abs_rel_toggle_button.place(anchor='n', relx=0.76, rely=y, relwidth=0.1, relheight=0.06)
+            self.monitor_buttons[i]["abs-rel"] = self.abs_rel_toggle_button
         
             self.zero_button = tk.Button(self.monitor_canvas, text='Zero', font=Helvetica_11_bold, bg=self.colors["light grey"])
             self.zero_button.configure(relief='groove', command=lambda x = self.zero_button: self.zero_button_func(x))
             self.zero_button.bind('<Enter>', lambda event, x=self.zero_button : self.on_hover(x))
             self.zero_button.bind('<Leave>', lambda event, x=self.zero_button : self.on_hover_leave(x))
             self.zero_button.place(anchor='n', relx=0.88, rely=y, relwidth=0.1, relheight=0.06)
+            self.monitor_buttons[i]["zero"] = self.zero_button
             
             self.abs_rel_toggle_buttons_list.append(self.abs_rel_toggle_button)
             self.zero_buttons_list.append(self.zero_button)
 
-            self.abs_rel_states_list = [val['text'] for val in self.abs_rel_toggle_buttons_list]
-            self.rel_zero_values_list = [0 for i in range(len(self.monitor_value_label_list))]
+            self.monitor_buttons[i]["toggle-state"] = self.monitor_buttons[i]["abs-rel"]["text"]
+            self.monitor_values[i]["zero-rel-val"] = 0
 
         for i in range(len(self.monitor_text_list)):
             y = (0.135+i*0.11)
@@ -450,14 +456,11 @@ class Application(tk.Tk):
         self.servo_speed_scale.bind('<Leave>', lambda event, x=self.servo_speed_scale : self.on_hover_leave(x))
         self.servo_speed_scale.place(anchor='n', relx=0.1, rely=0.675, relwidth=0.15, relheight=0.18)
 
-        self.logging_toggle_button = tk.Button(self.monitor_canvas, text='Record', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
-        self.logging_toggle_button.configure(command=self.record_toggle_but_func)
-        self.logging_toggle_button.bind('<Enter>', lambda event, x=self.logging_toggle_button : self.on_hover(x))
-        self.logging_toggle_button.bind('<Leave>', lambda event, x=self.logging_toggle_button : self.on_hover_leave(x))
-        self.logging_toggle_button.place(anchor='n', relx=0.813, rely=0.85, relwidth=0.3, relheight=0.07)
-
-
-
+        self.record_toggle_but = tk.Button(self.monitor_canvas, text='Record', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
+        self.record_toggle_but.configure(command=self.record_toggle_but_func)
+        self.record_toggle_but.bind('<Enter>', lambda event, x=self.record_toggle_but : self.on_hover(x))
+        self.record_toggle_but.bind('<Leave>', lambda event, x=self.record_toggle_but : self.on_hover_leave(x))
+        self.record_toggle_but.place(anchor='n', relx=0.813, rely=0.85, relwidth=0.3, relheight=0.07)
 
 
     def button_press(self, parent):
@@ -468,7 +471,6 @@ class Application(tk.Tk):
                 self.jog_plus_button_func()
             elif parent == self.jog_minus_button:
                 self.jog_minus_button_func()
-            
 
 
     def button_release(self, parent):
@@ -501,10 +503,6 @@ class Application(tk.Tk):
             self.s.send('srvstop')
         time.sleep(0.05)
         self.s.send('vmon 8 100')
-    
-        
-
-
 
 
     # handling the 'home' button function
@@ -543,26 +541,23 @@ class Application(tk.Tk):
         else:
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
-
     
-    def abs_rel_toggle_button_func(self, button):
+    def abs_rel_toggle_button_func(self, idx):
         if self.s.connected:
-            button_index = self.abs_rel_toggle_buttons_list.index(button)
-            current_state = button['text']
+            current_state = self.monitor_buttons[idx]["abs-rel"]["text"]
             if current_state == 'Abs':
-                button['text'] = 'Rel'
+                self.monitor_buttons[idx]["abs-rel"]["text"] = 'Rel'
             elif current_state == 'Rel':
-                button['text'] = 'Abs'
-            self.abs_rel_states_list[button_index] = button['text']
+                self.monitor_buttons[idx]["abs-rel"]["text"] = 'Abs'
+            self.monitor_buttons[idx]["toggle-state"] = self.monitor_buttons[idx]["abs-rel"]["text"]
         else:
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
 
-    def zero_button_func(self, button):
+    def zero_button_func(self, idx):
         if self.s.connected:
-            button_index = self.zero_buttons_list.index(button)
-            if self.abs_rel_states_list[button_index] == 'Abs':
-                self.rel_zero_values_list[button_index] = float('{:.2f}'.format(float(self.monitor_value_label_list[button_index]['text'])))
+            if self.monitor_buttons[idx]["toggle-state"] == "Abs":
+                self.monitor_values[idx]["zero-rel-val"] = float('{:.2f}'.format(float(self.monitor_values[idx]["widget"]["text"])))
             else:
                 tk.messagebox.showinfo(title='Warning', message='Need to be in "Abs" mode to use Zero.')
         else:
@@ -570,17 +565,17 @@ class Application(tk.Tk):
 
     
     def update_rel_abs_button_text(self):
-        for index, button in enumerate(self.abs_rel_toggle_buttons_list):
-            button['text'] = self.abs_rel_states_list[index]
+        for x in self.monitor_buttons:
+            x["abs-rel"]["text"] = x["toggle-state"]
 
 
     def record_toggle_but_func(self):
         if self.s.connected:
-            if self.logging_toggle_button['text'] == 'Record':
-                self.logging_toggle_button['text'] = 'Stop Recording'
+            if self.record_toggle_but['text'] == 'Record':
+                self.record_toggle_but['text'] = 'Stop Recording'
                 self.s.toggle_record('on')
             else:
-                self.logging_toggle_button['text'] = 'Record'
+                self.record_toggle_but['text'] = 'Record'
                 self.s.toggle_record('off')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')
@@ -809,17 +804,6 @@ class Application(tk.Tk):
         self.contact_info_label.configure(state='disabled')
         self.contact_info_label.place(anchor='n', relx=0.5, rely=0.38, relwidth=0.36, relheight=0.1)
 
-        self.creator_label = tk.Text(self.about_canvas, font=Helvetica_12, bg=self.colors["white"], borderwidth=0)
-        self.creator_label.insert('1.0', 'Tuning-GUI creator info:')
-        self.creator_label.configure(state='disabled')
-        self.creator_label.place(anchor='n', relx=0.5, rely=0.58, relwidth=0.35, relheight=0.1)
-
-        self.creator_info_label = tk.Text(self.about_canvas, font=Helvetica_11, bg=self.colors["white"], borderwidth=0)
-        self.creator_info_label.insert('1.0', 'Bill Brousalis\nbill.brousalis@gmail.com')
-        self.creator_info_label.configure(state='disabled')
-        self.creator_info_label.place(anchor='n', relx=0.5, rely=0.65, relwidth=0.35, relheight=0.1)
-
-        
         # Firmware version at the bottom of the page
         self.firmware_version_label = tk.Label(self.about_canvas, text='version : (connect to view firmware version)', bg=self.colors["white"], font=self.font +'11')
         self.firmware_version_label.place(anchor='n', relx=0.65, rely=0.93)

@@ -147,9 +147,6 @@ class Application(tk.Tk):
                 # get first tab's values
                 self.update_tuning_values()
 
-                if self.current_tab in self.tabs_to_be_updated:
-                    self.s.send("vmon 8 100")
-
                 self.handle_tabs()
             else:
                 self.connect_button['text'] = "Connect"
@@ -714,26 +711,6 @@ class Application(tk.Tk):
 
 
 
-
-    #--------------------------------------------CREATE THE '3D' TAB - REAL TIME 3D ORIENTATION OF OBJECT--------------------------------------------
-    def create_3D_tab(self):
-        self.my3D_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.my3D_tab, text='Real Time 3D')
-
-        self.my3D_canvas = tk.Canvas(self.my3D_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["black"])
-        self.my3D_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
-
-        Helvetica_10_bold = tkFont.Font(family='Helvetica', size=10, weight='bold')
-
-        self.tk_rpy_label = tk.Label(self.my3D_canvas, text='Connect to view real time 3D orientation of object', 
-            font=Helvetica_10_bold, bg=self.colors["black"], fg='white')
-        self.tk_rpy_label.place(anchor='n', relx=0.5, rely=0.85, relwidth=0.7, relheight=0.05)
-
-
-
-
-
-
 #--------------------------------------------CREATING THE 'SETTINGS' TAB --------------------------------------------
     def create_calib_tab(self):
         self.settings_tab = ttk.Frame(self.tab_parent)
@@ -877,7 +854,7 @@ class Application(tk.Tk):
 
     #function checking connection state and using serialComms module to receive data
     def read_serial(self):
-        while self.s.connected and self.s.quat == False and self.current_tab in self.tabs_to_be_updated:
+        while self.s.connected and self.current_tab in self.tabs_to_be_updated:
             self.s.recv()
             time.sleep(0.0001)
             self.reading_thread = True
@@ -898,6 +875,7 @@ class Application(tk.Tk):
             try:             
                 self.s.recv(collect=True)
                 graph_data = self.s.return_graph_data()
+                print(f'graph data:\n{graph_data}')
                 values = [item[len(item)-1] for item in graph_data]    
                 for index, (val_label, value) in enumerate(zip(self.monitor_value_label_list, values)):
                     if index == 4:
@@ -910,8 +888,9 @@ class Application(tk.Tk):
                         val_label['text'] = str(round(value, 2))
                     elif self.abs_rel_states_list[index] == 'Rel':
                         val_label['text'] = str(round(value - self.rel_zero_values_list[index], 2))
-            except:
-                print('error on update_monitor_gui...')
+            except Exception as e:
+                print(f'error on update_monitor_gui... {e}')
+        print("EXITING MONITOR THREAD...")
 
 
 

@@ -129,8 +129,8 @@ class SerialClass():
                 if collect:
                     self.collect_data(rec)
                 return rec
-            except:
-                print('error in receive')
+            except Exception as e:
+                print(f'error in receive {e}')
         else:
             print('Not connected')
 

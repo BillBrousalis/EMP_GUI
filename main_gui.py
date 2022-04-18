@@ -34,13 +34,6 @@ class Application(tk.Tk):
     # **************
     font = 'Helvetica '
 
-    graph_color_list = ['r','b', 'g', 'm', 'k']
-
-    #---------------------DEFAULT / MIN / MAX VALUES OF ADJUSTABLE VARIABLES---------------------
-
-    #****** what the fuck is this for 
-    default_servo_speed = 50
-
     #--------------------------------------------INITIALIZING CLASS--------------------------------------------
     def __init__(self):
         super().__init__()
@@ -49,15 +42,21 @@ class Application(tk.Tk):
         self.iconbitmap(default='files\pictures-icon\\boat_icon.ico')
 
         self.min_max_defaults_list = []
+        self.default_com, self.default_baud, self.default_servo_speed = None, None, 50
 
         self.s = serial_comms.SerialClass()
-        self.reading_thread = False
         self.create_GUI()
+        self.read_last_config()
+        self.s.set(com=self.default_com, baud=self.default_baud)
+        self.set_defaults()
+        self.reading_thread = False
  
 
-
-
-
+    def set_defaults(self):
+        self.com_port_var.set(self.s.COM)
+        self.servo_speed_scale.set(self.default_servo_speed)
+        for i in range(len(self.monitor_buttons)):
+            self.monitor_buttons[i]["abs-rel"]["text"] = self.monitor_buttons[i]["toggle-state"]
 
 
     #--------------------------------------------CREATING GUI FRAME / TABS AND THREAD TO KEEP REFRESHING IT--------------------------------------------
@@ -68,7 +67,6 @@ class Application(tk.Tk):
 
         self.tab_parent = ttk.Notebook(self.mainFrame)
 
-        self.tabs_to_be_updated = [1,2]
         self.tabs = [{'name': 'Tuning', 'thread': False},
                      {'name': 'Monitor', 'thread': True},
                      {'name': 'Graphing', 'thread': True},
@@ -89,39 +87,39 @@ class Application(tk.Tk):
         
     #--------------------------------------------TOP OF THE FRAME / WIDGETS TO HANDLE SERIAL CONNECTIONS--------------------------------------------
     def create_serial_gui(self):
-        self.serial_canvas = tk.Canvas(self.mainFrame, width=self.WIDTH, height=self.HEIGHT/6, bg=self.colors["light grey"], relief='groove')
-        self.serial_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=0.08)
+        canvas = tk.Canvas(self.mainFrame, width=self.WIDTH, height=self.HEIGHT/6, bg=self.colors["light grey"], relief='groove')
+        canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=0.08)
 
         Helvetica_10_bold = tkFont.Font(family='Helvetica', size=10, weight='bold')
 
-        self.port_label = tk.Label(self.serial_canvas, text='Com port:', font=Helvetica_10_bold, bg = self.colors["light grey"])
+        self.port_label = tk.Label(canvas, text='Com port:', font=Helvetica_10_bold, bg = self.colors["light grey"])
         self.port_label.place(anchor='n', relx=0.1, rely=0.15, relwidth=0.15, relheight=0.7)
 
-        self.com_port_var = tk.StringVar(self.serial_canvas)
+        self.com_port_var = tk.StringVar(canvas)
         self.com_port_var.set(self.s.COM)
 
         avail_ports = self.s.get_ports()
-        self.com_port_menu = tk.OptionMenu(self.serial_canvas, self.com_port_var, *avail_ports)
+        self.com_port_menu = tk.OptionMenu(canvas, self.com_port_var, *avail_ports)
         self.com_port_menu.config(font=Helvetica_10_bold, bg=self.colors["light grey"], relief='groove')
         self.com_port_menu.place(anchor='n', relx=0.25, rely=0.155, relwidth=0.17, relheight=0.7)
 
-        self.refresh_com_ports_button = tk.Button(self.serial_canvas, text='Refresh', bg=self.colors["light grey"], relief='groove',
+        self.refresh_com_ports_button = tk.Button(canvas, text='Refresh', bg=self.colors["light grey"], relief='groove',
             command=functools.partial(self.update_port_OptionMenu))
         self.refresh_com_ports_button.bind('<Enter>', lambda event, x=self.refresh_com_ports_button : self.on_hover(x))
         self.refresh_com_ports_button.bind('<Leave>', lambda event, x=self.refresh_com_ports_button : self.on_hover_leave(x))
         self.refresh_com_ports_button.place(anchor='n', relx=0.385, rely=0.205, relwidth=0.1, relheight=0.6)
 
-        self.baud_rate_var = tk.StringVar(self.serial_canvas) 
+        self.baud_rate_var = tk.StringVar(canvas) 
         self.baud_rate_var.set(str(self.s.BAUD))
 
-        self.baud_label = tk.Label(self.serial_canvas, text='Baud Rate:', font=Helvetica_10_bold, bg=self.colors["light grey"])
+        self.baud_label = tk.Label(canvas, text='Baud Rate:', font=Helvetica_10_bold, bg=self.colors["light grey"])
         self.baud_label.place(anchor='n', relx=0.52, rely=0.15, relwidth=0.15, relheight=0.7)
 
-        self.baud_menu = tk.OptionMenu(self.serial_canvas, self.baud_rate_var, *self.s.baud_rate_list)
+        self.baud_menu = tk.OptionMenu(canvas, self.baud_rate_var, *self.s.baud_rate_list)
         self.baud_menu.config(font=Helvetica_10_bold, bg=self.colors["light grey"], relief='groove')
         self.baud_menu.place(anchor='n', relx=0.68, rely=0.15, relwidth=0.17, relheight=0.7)
 
-        self.connect_button = tk.Button(self.serial_canvas, text='Connect', font=Helvetica_10_bold, relief='groove',
+        self.connect_button = tk.Button(canvas, text='Connect', font=Helvetica_10_bold, relief='groove',
             bg=self.colors["black"], activebackground=self.colors["light grey"], fg='white', command=functools.partial(self.connect_button_func))
         self.connect_button.place(anchor='n', relx=0.875, rely=0.15, relwidth=0.17, relheight=0.7)
 
@@ -136,14 +134,8 @@ class Application(tk.Tk):
             self.connect_button['text'] = "Close"
             time.sleep(0.01)
             if self.s.connected:
-                self.abs_rel_states_list = self.s.abs_rel_toggle_states
-                self.rel_zero_values_list = self.s.rel_zero_values_list
-                self.update_rel_abs_button_text()
-                # SHOW VERSION ON SETTINGS TAB
                 self.firmware_version_label['text'] = f'version : {self.s.get_firmware_version()}'
-                # get first tab's values
                 self.update_tuning_values()
-
                 self.handle_tabs()
             else:
                 self.connect_button['text'] = "Connect"
@@ -151,16 +143,19 @@ class Application(tk.Tk):
 
         else:
             if self.s.connected:
+                if self.start_graph_button['text'] == "Stop Graph":
+                    self.start_graph_button_func()
                 self.cleanup_serial()
-            # ******** move this somewhere else: handle tabs probably
-            if self.start_graph_button['text'] == "Stop Graph":
-                self.start_graph_button_func()
             self.connect_button['text'] = "Connect"
 
+
     def cleanup_serial(self):
-        self.s.send("vmon 0 0")
-        time.sleep(0.01)
-        self.s.disconnect()
+        if self.s.connected:
+            self.s.send("vmon 0 0")
+            self.s.serialFlush()
+            time.sleep(0.01)
+            self.s.disconnect()
+
 
     def handle_tabs(self):
         if self.tabs[self.current_tab]["thread"]:
@@ -168,25 +163,14 @@ class Application(tk.Tk):
                 self.s.serialFlush()
                 self.s.send("vmon 8 100")
                 self.read_serial_thread()
-                self.open_thread()
+                if self.current_tab == 1:
+                    self.monitor_thread = threading.Thread(target=self.monitor_thread_loop)
+                    self.monitor_thread.daemon = True
+                    self.monitor_thread.start()
         else:
             self.s.send("vmon 0 0")
             self.wait_for_thread_to_close()
             self.s.serialFlush()
-        
-
-    def open_thread(self):
-        if self.current_tab == 1:
-            self.monitor_thread = threading.Thread(target=self.monitor_thread_loop)
-            self.monitor_thread.daemon = True
-            self.monitor_thread.start()
-        '''
-        elif self.current_tab == 2:
-            self.graph_thread = threading.Thread(target=self.animation_thread)
-            self.graph_thread.daemon = True
-            self.graph_thread.start()
-            print("OPENING GRAPH THREAD")
-        '''
 
 
     # handling the refresh button for the available ports
@@ -198,15 +182,12 @@ class Application(tk.Tk):
             menu.add_command(label=port, command=lambda p=port: self.com_port_var.set(p))
 
 
-
     #--------------------------------------------CREATING THE 'VANE / SERVO' TAB - ADDING WIDGETS--------------------------------------------
     def create_tuning_tab(self):
         self.tuning_tab = ttk.Frame(self.tab_parent)
         self.tab_parent.add(self.tuning_tab, text='Tuning')
-        self.tuning_canvas = tk.Canvas(self.tuning_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
-        self.tuning_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
-
-        self.vane_entry_widgets_list = []
+        canvas = tk.Canvas(self.tuning_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
+        canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
         self.tuning_values = [{"text": "Offset :", "min": -20, "max": 20, "default": 0, "id": "voffs", "step": 0.01},
                               {"text": "Gain(Deg/Deg) :", "min": -5000, "max": 5000, "default": 0.00, "id": "vgain", "step": 0.01},
@@ -225,36 +206,32 @@ class Application(tk.Tk):
 
         for i, config in enumerate(self.tuning_values): 
             y = (0.03+i*0.08)
-            self.mylabel = tk.Label(self.tuning_canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
+            self.mylabel = tk.Label(canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.mylabel.place(anchor='n', relx=0.17, rely=y, relwidth=0.3, relheight=0.065)  
 
-            self.entry = tk.Entry(self.tuning_canvas, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
-
-            self.tuning_values[i]['entry'] = self.entry
-
+            self.entry = tk.Entry(canvas, font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
             self.entry.insert(0, config["default"])
             self.entry.bind('<Return>', lambda event, x=i: self.on_enter_press(x))
             self.entry.bind('<Enter>', lambda event, x=self.entry : self.on_hover(x))
             self.entry.bind('<Leave>', lambda event, x=self.entry : self.on_hover_leave(x))
             self.entry.place(anchor='n', relx=0.54, rely=y+0.005, relwidth=0.42, relheight=0.055)
+            self.tuning_values[i]["entry"] = self.entry
 
-            #append entry widget to a list of the vane/servo 's tab entry widgets ------ access individual widget by using self.vane_entry_widgets_list[i]
-            self.minus_but = tk.Button(self.tuning_canvas, text='-', font='Helvetica 14 bold', bg=self.colors["light grey"],
+            self.minus_but = tk.Button(canvas, text='-', font='Helvetica 14 bold', bg=self.colors["light grey"],
                 relief='groove', command=functools.partial(self.adjust_value, '-', i))
             self.minus_but.bind('<Enter>', lambda event, x=self.minus_but : self.on_hover(x))
             self.minus_but.bind('<Leave>', lambda event, x=self.minus_but : self.on_hover_leave(x))    
             self.minus_but.place(anchor='n', relx=0.82, rely=y+0.005, relwidth=0.095, relheight=0.05)
 
-            self.plus_but = tk.Button(self.tuning_canvas, text='+', font='Helvetica 13 bold', bg=self.colors["light grey"],
+            self.plus_but = tk.Button(canvas, text='+', font='Helvetica 13 bold', bg=self.colors["light grey"],
                 relief='groove', command=functools.partial(self.adjust_value, '+', i))
             self.plus_but.bind('<Enter>', lambda event, x=self.plus_but : self.on_hover(x))
             self.plus_but.bind('<Leave>', lambda event, x=self.plus_but : self.on_hover_leave(x))
             self.plus_but.place(anchor='n', relx=0.92, rely=y+0.005, relwidth=0.095, relheight=0.05)
 
 
-
         # SAVE - RESET DEFAULT VALUES BUTTONS
-        self.save_button = tk.Button(self.tuning_canvas, text='Save', font=Helvetica_11_bold, bg=self.colors["light grey"],
+        self.save_button = tk.Button(canvas, text='Save', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=functools.partial(self.save_values))
         self.save_button.bind('<Enter>', lambda event, x=self.save_button : self.on_hover(x))
         self.save_button.bind('<Leave>', lambda event, x=self.save_button : self.on_hover_leave(x))
@@ -350,46 +327,42 @@ class Application(tk.Tk):
 
 
 
-
-
-
     #--------------------------------------------CREATING THE 'MONITOR' TAB - ADDING WIDGETS--------------------------------------------
     def create_monitor_tab(self):
         self.monitor_tab = ttk.Frame(self.tab_parent)
         self.tab_parent.add(self.monitor_tab, text='Monitor')
-        self.monitor_canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
-        self.monitor_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
+        canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
+        canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
-        self.monitor_values = [{"val": None, "text": "Roll :", "default": 0, "widget": None, "zero-rel-val": None},
-                               {"val": None, "text": "Pitch :", "default": 0, "widget": None, "zero-rel-val": None},
-                               {"val": None, "text": "Yaw :", "default": 0, "widget": None, "zero-rel-val": None},
-                               {"val": None, "text": "Vane :", "default": 0, "widget": None, "zero-rel-val": None},
-                               {"val": None, "text": "Wing :", "default": 0, "widget": None, "zero-rel-val": None}]
+        self.monitor_values = [{"text": "Roll :", "default": 0, "widget": None, "zero-rel-val": None, "color": "r"},
+                               {"text": "Pitch :", "default": 0, "widget": None, "zero-rel-val": None, "color": "b"},
+                               {"text": "Yaw :", "default": 0, "widget": None, "zero-rel-val": None, "color": "g"},
+                               {"text": "Vane :", "default": 0, "widget": None, "zero-rel-val": None, "color": "m"},
+                               {"text": "Wing :", "default": 0, "widget": None, "zero-rel-val": None, "color": "k"}]
         
         self.monitor_buttons = [{"abs-rel": None, "toggle-state": None, "zero": None}  for _ in range(5)]
-        
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
         #--------------------------------------------AGAIN USING A FOR LOOP TO AVOID BIG BLOCK OF REPEATING CODE--------------------------------------------
         for i, config in enumerate(self.monitor_values):
             y = (0.05+i*0.11)
-            self.monitor_label = tk.Label(self.monitor_canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
+            self.monitor_label = tk.Label(canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.monitor_label.place(anchor='n', relx=0.13, rely=y, relwidth=0.11, relheight=0.06)  
 
-            self.monitor_value_label = tk.Label(self.monitor_canvas, text=str(config["default"]), font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
+            self.monitor_value_label = tk.Label(canvas, text=str(config["default"]), font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
             self.monitor_value_label.place(anchor='n', relx=0.45, rely=y, relwidth=0.45, relheight=0.06)
             self.monitor_values[i]["widget"] = self.monitor_value_label
 
-            self.abs_rel_toggle_button = tk.Button(self.monitor_canvas, text='Abs', font=Helvetica_11_bold, bg=self.colors["light grey"])
-            self.abs_rel_toggle_button.configure(relief='groove', command=lambda x = self.abs_rel_toggle_button : self.abs_rel_toggle_button_func(x))
+            self.abs_rel_toggle_button = tk.Button(canvas, text='Abs', font=Helvetica_11_bold, bg=self.colors["light grey"])
+            self.abs_rel_toggle_button.configure(relief='groove', command=lambda x=i : self.abs_rel_toggle_button_func(x))
             self.abs_rel_toggle_button.bind('<Enter>', lambda event, x=self.abs_rel_toggle_button : self.on_hover(x))
             self.abs_rel_toggle_button.bind('<Leave>', lambda event, x=self.abs_rel_toggle_button : self.on_hover_leave(x))
             self.abs_rel_toggle_button.place(anchor='n', relx=0.76, rely=y, relwidth=0.1, relheight=0.06)
             self.monitor_buttons[i]["abs-rel"] = self.abs_rel_toggle_button
         
-            self.zero_button = tk.Button(self.monitor_canvas, text='Zero', font=Helvetica_11_bold, bg=self.colors["light grey"])
-            self.zero_button.configure(relief='groove', command=lambda x = self.zero_button: self.zero_button_func(x))
+            self.zero_button = tk.Button(canvas, text='Zero', font=Helvetica_11_bold, bg=self.colors["light grey"])
+            self.zero_button.configure(relief='groove', command=lambda x=i: self.zero_button_func(x))
             self.zero_button.bind('<Enter>', lambda event, x=self.zero_button : self.on_hover(x))
             self.zero_button.bind('<Leave>', lambda event, x=self.zero_button : self.on_hover_leave(x))
             self.zero_button.place(anchor='n', relx=0.88, rely=y, relwidth=0.1, relheight=0.06)
@@ -400,57 +373,52 @@ class Application(tk.Tk):
 
         for i in range(5):
             y = (0.135+i*0.11)
-            self.valSeparator = ttk.Separator(self.monitor_canvas)
+            self.valSeparator = ttk.Separator(canvas)
             self.valSeparator.place(anchor='n', relx=0.5, rely=y, relwidth=0.8)
 
-
         self.start_stop_state = 'start'
-            
-        self.start_stop_button = tk.Button(self.monitor_canvas, text='Start', font=Helvetica_11_bold, bg=self.colors["light grey"],
+        self.start_stop_button = tk.Button(canvas, text='Start', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=lambda: self.start_stop_button_func())
         self.start_stop_button.bind('<Enter>', lambda event, x=self.start_stop_button : self.on_hover(x))
         self.start_stop_button.bind('<Leave>', lambda event, x=self.start_stop_button : self.on_hover_leave(x))
         self.start_stop_button.place(anchor='n', relx=0.48, rely=0.73, relwidth=0.17, relheight=0.07)
-        
 
-        self.home_button = tk.Button(self.monitor_canvas, text='Home', font=Helvetica_11_bold, bg=self.colors["light grey"],
+        self.home_button = tk.Button(canvas, text='Home', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=lambda: self.home_button_func())
         self.home_button.bind('<Enter>', lambda event, x=self.home_button : self.on_hover(x))
         self.home_button.bind('<Leave>', lambda event, x=self.home_button : self.on_hover_leave(x))
         self.home_button.place(anchor='n', relx=0.68, rely=0.73, relwidth=0.17, relheight=0.07)
 
-        self.servo_reset_button = tk.Button(self.monitor_canvas, text='Reset', font=Helvetica_11_bold, bg=self.colors["light grey"],
+        self.servo_reset_button = tk.Button(canvas, text='Reset', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=self.servo_reset_button_func)
         self.servo_reset_button.bind('<Enter>', lambda event, x=self.servo_reset_button : self.on_hover(x))
         self.servo_reset_button.bind('<Leave>', lambda event, x=self.servo_reset_button : self.on_hover_leave(x))
         self.servo_reset_button.place(anchor='n', relx=0.88, rely=0.73, relwidth=0.17, relheight=0.07)
 
-
-        self.jog_plus_button = tk.Button(self.monitor_canvas, text='Jog +', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
+        self.jog_plus_button = tk.Button(canvas, text='Jog +', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.jog_plus_button.bind("<ButtonPress>", lambda event, parent=self.jog_plus_button: self.button_press(parent))
         self.jog_plus_button.bind("<ButtonRelease>", lambda event, parent=self.jog_plus_button: self.button_release(parent))
         self.jog_plus_button.bind('<Enter>', lambda event, x=self.jog_plus_button : self.on_hover(x))
         self.jog_plus_button.bind('<Leave>', lambda event, x=self.jog_plus_button : self.on_hover_leave(x))
         self.jog_plus_button.place(anchor='n', relx=0.28, rely=0.68, relwidth=0.17, relheight=0.07)
 
-        self.jog_minus_button = tk.Button(self.monitor_canvas, text='Jog -', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
+        self.jog_minus_button = tk.Button(canvas, text='Jog -', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.jog_minus_button.bind("<ButtonPress>", lambda event, parent=self.jog_minus_button: self.button_press(parent))
         self.jog_minus_button.bind("<ButtonRelease>", lambda event, parent=self.jog_minus_button: self.button_release(parent))
         self.jog_minus_button.bind('<Enter>', lambda event, x=self.jog_minus_button : self.on_hover(x))
         self.jog_minus_button.bind('<Leave>', lambda event, x=self.jog_minus_button : self.on_hover_leave(x))
         self.jog_minus_button.place(anchor='n', relx=0.28, rely=0.78, relwidth=0.17, relheight=0.07)
 
-
-        self.servo_speed_label = tk.Label(self.monitor_canvas, text='speed', font='Helvetica 10 bold', bg=self.colors["white"], relief='groove')
+        self.servo_speed_label = tk.Label(canvas, text='speed', font='Helvetica 10 bold', bg=self.colors["white"], relief='groove')
         self.servo_speed_label.place(anchor='n', relx=0.08, rely=0.63, relwidth=0.1, relheight=0.05)  
 
-        self.servo_speed_scale = tk.Scale(self.monitor_canvas, from_=0, to=100, tickinterval=100, orient='vertical', bg=self.colors["light grey"], relief='groove')
+        self.servo_speed_scale = tk.Scale(canvas, from_=0, to=100, tickinterval=100, orient='vertical', bg=self.colors["light grey"], relief='groove')
         self.servo_speed_scale.set(self.default_servo_speed)
         self.servo_speed_scale.bind('<Enter>', lambda event, x=self.servo_speed_scale : self.on_hover(x))
         self.servo_speed_scale.bind('<Leave>', lambda event, x=self.servo_speed_scale : self.on_hover_leave(x))
         self.servo_speed_scale.place(anchor='n', relx=0.1, rely=0.675, relwidth=0.15, relheight=0.18)
 
-        self.record_toggle_but = tk.Button(self.monitor_canvas, text='Record', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
+        self.record_toggle_but = tk.Button(canvas, text='Record', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.record_toggle_but.configure(command=self.record_toggle_but_func)
         self.record_toggle_but.bind('<Enter>', lambda event, x=self.record_toggle_but : self.on_hover(x))
         self.record_toggle_but.bind('<Leave>', lambda event, x=self.record_toggle_but : self.on_hover_leave(x))
@@ -500,7 +468,6 @@ class Application(tk.Tk):
         self.s.send('vmon 8 100')
 
 
-    # handling the 'home' button function
     def home_button_func(self):
         if self.s.connected:
             self.s.send('home')
@@ -510,7 +477,6 @@ class Application(tk.Tk):
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
 
-    # handling the start / stop button function - keeping track of its state
     def start_stop_button_func(self):
         if self.s.connected:
             if self.start_stop_state == 'start':
@@ -527,7 +493,6 @@ class Application(tk.Tk):
             tkinter.messagebox.showinfo(title='Error', message="You are not connected to a serial port.")
 
 
-    # handling the 'servo reset' button function
     def servo_reset_button_func(self):
         if self.s.connected:
             self.s.send('srvreset')
@@ -576,8 +541,6 @@ class Application(tk.Tk):
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')
 
 
-
-
     #--------------------------------------------CREATING THE 'GRAPH' TAB USING MATPLOTLIB FIGURES--------------------------------------------
     def create_graph_tab(self):
         self.graph_data = self.s.data
@@ -586,43 +549,43 @@ class Application(tk.Tk):
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
-        self.parent_canvas = tk.Canvas(self.graph_tab, bg=self.colors["white"], relief='groove')
-        self.parent_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
+        canvas = tk.Canvas(self.graph_tab, bg=self.colors["white"], relief='groove')
+        canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
         
-        self.start_graph_button = tk.Button(self.parent_canvas, text='Start Graph', font=Helvetica_11_bold,
+        self.start_graph_button = tk.Button(canvas, text='Start Graph', font=Helvetica_11_bold,
             bg=self.colors["light grey"], relief='groove', command=functools.partial(self.start_graph_button_func))
         self.start_graph_button.bind('<Enter>', lambda event, x=self.start_graph_button : self.on_hover(x))
         self.start_graph_button.bind('<Leave>', lambda event, x=self.start_graph_button : self.on_hover_leave(x))
         self.start_graph_button.place(anchor='n', relx=0.77, rely=0.9, relwidth=0.22, relheight=0.07)
         
-        self.clear_graph_button = tk.Button(self.parent_canvas, text='Clear Data', font=Helvetica_11_bold,
+        self.clear_graph_button = tk.Button(canvas, text='Clear Data', font=Helvetica_11_bold,
             bg=self.colors["light grey"], relief='groove', command=functools.partial(self.s.clear_data))
         self.clear_graph_button.bind('<Enter>', lambda event, x=self.clear_graph_button : self.on_hover(x))
         self.clear_graph_button.bind('<Leave>', lambda event, x=self.clear_graph_button : self.on_hover_leave(x))
         self.clear_graph_button.place(anchor='n', relx=0.52, rely=0.9, relwidth=0.22, relheight=0.07)
 
         #USE PREFIXED COLORS FOR OUR VALUES SO NO LABELING IS NEEDING INSIDE THE GRAPH
-        self.roll_color_label = tk.Label(self.parent_canvas, text='Roll', fg='red', bg=self.colors["white"], font=Helvetica_11_bold)
+        self.roll_color_label = tk.Label(canvas, text='Roll', fg='red', bg=self.colors["white"], font=Helvetica_11_bold)
         self.roll_color_label.place(anchor='n', relx=0.3, rely=0.01)
 
-        self.pitch_color_label = tk.Label(self.parent_canvas, text='Pitch', fg='blue', bg=self.colors["white"], font=Helvetica_11_bold)
+        self.pitch_color_label = tk.Label(canvas, text='Pitch', fg='blue', bg=self.colors["white"], font=Helvetica_11_bold)
         self.pitch_color_label.place(anchor='n', relx=0.4, rely=0.01)
 
-        self.yaw_color_label = tk.Label(self.parent_canvas, text='Yaw', fg='green', bg=self.colors["white"], font=Helvetica_11_bold)
+        self.yaw_color_label = tk.Label(canvas, text='Yaw', fg='green', bg=self.colors["white"], font=Helvetica_11_bold)
         self.yaw_color_label.place(anchor='n', relx=0.5, rely=0.01)
 
-        self.vane_color_label = tk.Label(self.parent_canvas, text='Vane', fg='purple', bg=self.colors["white"], font=Helvetica_11_bold)
+        self.vane_color_label = tk.Label(canvas, text='Vane', fg='purple', bg=self.colors["white"], font=Helvetica_11_bold)
         self.vane_color_label.place(anchor='n', relx=0.6, rely=0.01)
 
-        self.wing_color_label = tk.Label(self.parent_canvas, text='Wing', fg='black', bg=self.colors["white"], font=Helvetica_11_bold)
+        self.wing_color_label = tk.Label(canvas, text='Wing', fg='black', bg=self.colors["white"], font=Helvetica_11_bold)
         self.wing_color_label.place(anchor='n', relx=0.7, rely=0.01)
 
-        self.graph_Separator = ttk.Separator(self.parent_canvas)
+        self.graph_Separator = ttk.Separator(canvas)
         self.graph_Separator.place(anchor='n', relx=0.5, rely=0.058, relwidth=0.5)
 
         #CREATING MATPLOTLIB PLT FIGURE - DRAW INSIDE THE GRAPH CANVAS CREATED
         self.figure = plt.Figure()
-        self.graph_canvas = FigureCanvasTkAgg(self.figure, master=self.parent_canvas)
+        self.graph_canvas = FigureCanvasTkAgg(self.figure, master=canvas)
         self.graph_canvas.get_tk_widget().place(anchor='n', relx=0.5, rely=0.06, relwidth=0.95, relheight=0.82)
         self.graph_canvas.draw()
         
@@ -634,11 +597,8 @@ class Application(tk.Tk):
         self.annot = self.ax.annotate("", xy=(0,0), xytext=(-40,40),textcoords="offset points",
                     bbox=dict(boxstyle='round', fc='white', ec='k', lw=1),
                     arrowprops=dict(arrowstyle='->'))
-        #self.annot.set_visible(False)
-        
         #SETTING THE UPDATE RATE OF THE GRAPHING FUNCTION - GRAPHS EVERY 300 MSECS
         self.interval = 300
-
 
 
     def on_mouse_move_graph(self, event):
@@ -681,23 +641,17 @@ class Application(tk.Tk):
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')
         
 
-
     def enable_coords(self):
         self.show_coords_event = self.figure.canvas.mpl_connect('motion_notify_event', self.on_mouse_move_graph)
-
         self.annot = self.ax.annotate("", xy=(0,0), xytext=(-40,40),textcoords="offset points",
                     bbox=dict(boxstyle='round', fc='white', ec='k', lw=1),
                     arrowprops=dict(arrowstyle='->'))
-
-
-
 
 
     #create the animation object and start animating
     def animation_thread(self):
         self.ani = FuncAnimation(self.figure, self.update_graph_gui, interval=self.interval)
         self.ani._start()
-
 
 
 
@@ -736,8 +690,6 @@ class Application(tk.Tk):
         self.format_button.place(anchor='n', relx=0.25, rely=0.35, relwidth=0.31, relheight=0.1)
 
 
-       
-
     def gyro_calibration_button_func(self):
         if self.s.connected:
             confirm = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the gyro sensor.\nAre you sure?')
@@ -763,8 +715,6 @@ class Application(tk.Tk):
                 self.s.send('format')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')  
-
-
 
 
     #--------------------------------------------CREATING THE 'ABOUT' TAB COMPANY AND CREATOR INFORMATION--------------------------------------------
@@ -889,7 +839,7 @@ class Application(tk.Tk):
             t_count_arr = list(t_count_arr)
             # plot the values
             for i, item in enumerate(dat):
-                self.ax.plot(t_count_arr, item, self.graph_color_list[i])
+                self.ax.plot(t_count_arr, item, self.monitor_values[i]["color"])
             self.ax.grid()
         except Exception as e:
             print(f'update_graph_gui exception : {e}')
@@ -929,58 +879,48 @@ class Application(tk.Tk):
     # in order to retrieve them when re-opening the app
     def write_to_config(self):
         with open('files\config.txt', 'r+') as file:
-            lines = file.readlines()
-            lines = [line.replace('\n', '') for line in lines]
+            lines = [x.strip() for x in file.readlines()]
             file.seek(0)
             for line in lines:
                 if "GRAPH_DISPLAY_LAST_X_SECONDS" in line:
                     file.write(line + '\n')
             file.truncate()
-            strings = ["DEFAULT_COM=", self.com_port_var.get(), '\n', "DEFAULT_BAUD=", str(self.baud_rate_var.get()), '\n', "DEFAULT_SERVO_SPEED=", str(self.servo_speed_scale.get()), '\n']
-            strings += [self.abs_rel_states_list[0].upper(), "/ZERO_ROLL=", str(self.rel_zero_values_list[0]), '\n', self.abs_rel_states_list[1].upper(), "/ZERO_PITCH=", str(self.rel_zero_values_list[1]), '\n', self.abs_rel_states_list[2].upper(), "/ZERO_YAW=", str(self.rel_zero_values_list[2]), '\n']
-            strings += [self.abs_rel_states_list[3].upper(), "/ZERO_VANE=", str(self.rel_zero_values_list[3]), '\n', self.abs_rel_states_list[4].upper(), "/ZERO_WING=", str(self.rel_zero_values_list[4]), '\n']
-            save = ''.join(strings)
+            concat = ["DEFAULT_COM=", self.com_port_var.get(), "\nDEFAULT_BAUD=", str(self.baud_rate_var.get()), "\nDEFAULT_SERVO_SPEED=", str(self.servo_speed_scale.get()), '\n']
+            x = ["/ZERO_ROLL=", "/ZERO_PITCH=", "/ZERO_YAW=", "/ZERO_VANE=", "/ZERO_WING="]
+            for i in range(5):
+                concat += [self.monitor_buttons[i]["toggle-state"].upper(), x[i], str(self.monitor_values[i]["zero-rel-val"]), "\n"]
+
+            save = ''.join(concat)
+            print("save:\n" + save)
             file.write(save)
 
 
     # ********** jesus christ re-write this
-    '''
     def read_last_config(self):   
         with open('files\config.txt', 'r') as file:
             lines = [x.strip() for x in file.readlines()]
             for line in lines:
                 if "DEFAULT_COM" in line:
-                    self.default_com = line.replace("DEFAULT_COM", '').replace(' ', '').replace('=', '')
+                    self.default_com = line.split("=")[1].strip() #line.replace("DEFAULT_COM", '').replace(' ', '').replace('=', '')
                 elif "DEFAULT_BAUD" in line:
-                    self.default_baud = line.replace("DEFAULT_BAUD", '').replace(' ', '').replace('=', '')
-                    self.default_baud = int(self.default_baud)
+                    self.default_baud = int(line.split("=")[1].strip()) #line.replace("DEFAULT_BAUD", '').replace(' ', '').replace('=', '')
             
                 elif "GRAPH_DISPLAY_LAST_X_SECONDS" in line:
-                    tmp = line.replace("GRAPH_DISPLAY_LAST_X_SECONDS", '').replace(' ', '').replace('=', '')
-                    tmp = float(tmp)
-                    self.x_limit = tmp * 10
+                    self.x_limit = 10 * float(line.split("=")[1].strip())
                 elif "DEFAULT_SERVO_SPEED" in line:
-                    self.default_servo_speed = line.replace("DEFAULT_SERVO_SPEED", "").replace(' ', '').replace('=', '')
-                    self.default_servo_speed = int(self.default_servo_speed)
+                    self.default_servo_speed = int(line.split("=")[1].strip())
                 elif "ZERO" in line:
+                    print(line)
                     val = float(line.split('/')[1].split('=')[1])
                     abs_rel_state = 'Abs' if 'ABS' in line.split('/')[0] else 'Rel'
-                    if "ROLL" in line:
-                        self.abs_rel_toggle_states[0] = abs_rel_state
-                        self.rel_zero_values_list[0] = val
-                    elif "PITCH" in line:
-                        self.abs_rel_toggle_states[1] = abs_rel_state
-                        self.rel_zero_values_list[1] = val
-                    elif "YAW" in line:
-                        self.abs_rel_toggle_states[2] = abs_rel_state
-                        self.rel_zero_values_list[2] = val
-                    elif "VANE" in line:
-                        self.abs_rel_toggle_states[3] = abs_rel_state
-                        self.rel_zero_values_list[3] = val
-                    elif "WING" in line:
-                        self.abs_rel_toggle_states[4] = abs_rel_state
-                        self.rel_zero_values_list[4] = val
-    '''
+
+                    d = {"ROLL": 0, "PITCH": 1, "YAW": 2, "VANE": 3, "WING": 4}
+                    for idx, name in enumerate(d.keys()):
+                        if name in line:
+                            self.monitor_buttons[idx]["toggle-state"] = abs_rel_state
+                            self.monitor_values[idx]["zero-rel-val"] = val
+
+
     #/////////////////////////////////////////////////////////////////////////////////
     # ////////////////////////////// CONFIG READ-WRITE ///////////////////////////////
     #/////////////////////////////////////////////////////////////////////////////////
@@ -991,8 +931,7 @@ class Application(tk.Tk):
     # run the write_to_config function to save
     def exit(self):
         self.cleanup_serial()
-        # ********* re-add when its fixed
-        #self.write_to_config()
+        self.write_to_config()
         self.quit()
         self.destroy()
 

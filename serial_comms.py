@@ -27,10 +27,8 @@ class SerialClass():
 
         self.abs_rel_toggle_states = ['' for _ in range(5)]
         self.rel_zero_values_list = [0 for _ in range(5)]
-        self.read_last_config()
 
         self.t_count = 0
-        #self.t_count_array = []
         self.data = deque()
         self.t_count_array = deque()
         self.number_of_graph_values = 5
@@ -38,48 +36,11 @@ class SerialClass():
         self.is_reading_serial = False
 
 
-
-
-
-    # read the config file to retrieve data for the last com port / baud rate used
-    def read_last_config(self):   
-        with open('files\config.txt', 'r') as file:
-            lines = [x.strip() for x in file.readlines()]
-        for line in lines:
-            if "DEFAULT_COM" in line:
-                self.default_com = line.replace("DEFAULT_COM", '').replace(' ', '').replace('=', '')
-            elif "DEFAULT_BAUD" in line:
-                self.default_baud = line.replace("DEFAULT_BAUD", '').replace(' ', '').replace('=', '')
-                self.default_baud = int(self.default_baud)
-        
-            elif "GRAPH_DISPLAY_LAST_X_SECONDS" in line:
-                tmp = line.replace("GRAPH_DISPLAY_LAST_X_SECONDS", '').replace(' ', '').replace('=', '')
-                tmp = float(tmp)
-                self.x_limit = tmp * 10
-            elif "DEFAULT_SERVO_SPEED" in line:
-                self.default_servo_speed = line.replace("DEFAULT_SERVO_SPEED", "").replace(' ', '').replace('=', '')
-                self.default_servo_speed = int(self.default_servo_speed)
-            elif "ZERO" in line:
-                val = float(line.split('/')[1].split('=')[1])
-                abs_rel_state = 'Abs' if 'ABS' in line.split('/')[0] else 'Rel'
-                if "ROLL" in line:
-                    self.abs_rel_toggle_states[0] = abs_rel_state
-                    self.rel_zero_values_list[0] = val
-                elif "PITCH" in line:
-                    self.abs_rel_toggle_states[1] = abs_rel_state
-                    self.rel_zero_values_list[1] = val
-                elif "YAW" in line:
-                    self.abs_rel_toggle_states[2] = abs_rel_state
-                    self.rel_zero_values_list[2] = val
-                elif "VANE" in line:
-                    self.abs_rel_toggle_states[3] = abs_rel_state
-                    self.rel_zero_values_list[3] = val
-                elif "WING" in line:
-                    self.abs_rel_toggle_states[4] = abs_rel_state
-                    self.rel_zero_values_list[4] = val
-            
-
-
+    def set(self, com=None, baud=None):
+        if com is not None:
+            self.COM = com
+        if baud is not None:
+            self.BAUD = baud
 
 
     # handle the connect function of the serial connection
@@ -201,6 +162,7 @@ class SerialClass():
     def serialFlush(self):
         if self.ser is not None:
             self.ser.flush()
+            self.ser.reset_output_buffer()
 
     # return the graph data collected
     def return_graph_data(self):

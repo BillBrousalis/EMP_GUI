@@ -51,11 +51,8 @@ class Application(tk.Tk):
         self.min_max_defaults_list = []
 
         self.s = serial_comms.SerialClass()
-        self.setup3D_complete = False
         self.reading_thread = False
         self.create_GUI()
-        self.default_servo_speed = self.s.return_default_servo_speed()
-        self.servo_speed_scale.set(self.default_servo_speed)
  
 
 
@@ -85,7 +82,7 @@ class Application(tk.Tk):
         self.create_about_tab()
 
         self.tab_parent.bind("<<NotebookTabChanged>>", self.on_tab_switch)
-        self.previous_tab = None
+        self.previous_tab = 0
         self.tab_parent.place(anchor='n', relx=0.5, rely=0.07, relwidth=1, relheight=0.93)
 
 
@@ -168,18 +165,28 @@ class Application(tk.Tk):
     def handle_tabs(self):
         if self.tabs[self.current_tab]["thread"]:
             if self.s.connected:
+                self.s.serialFlush()
                 self.s.send("vmon 8 100")
+                self.read_serial_thread()
                 self.open_thread()
+        else:
+            self.s.send("vmon 0 0")
+            self.wait_for_thread_to_close()
+            self.s.serialFlush()
+        
 
     def open_thread(self):
         if self.current_tab == 1:
             self.monitor_thread = threading.Thread(target=self.monitor_thread_loop)
             self.monitor_thread.daemon = True
             self.monitor_thread.start()
+        '''
         elif self.current_tab == 2:
             self.graph_thread = threading.Thread(target=self.animation_thread)
             self.graph_thread.daemon = True
             self.graph_thread.start()
+            print("OPENING GRAPH THREAD")
+        '''
 
 
     # handling the refresh button for the available ports
@@ -282,10 +289,10 @@ class Application(tk.Tk):
     # update tuning tab's values after using the 'dump1' command
     def update_tuning_values(self):
         try:
+            if not self.s.connected: return None
             fresh_dump = self.s.get_dump()
             for idx, value_set in enumerate(fresh_dump.items()):
                 val = str(value_set[1]).strip().replace(" ", "")
-                print(val)
                 self.tuning_values[idx]["entry"].delete(0, 'end')
                 self.tuning_values[idx]["entry"].insert(0, val)
         except Exception as e:
@@ -362,12 +369,6 @@ class Application(tk.Tk):
         self.monitor_buttons = [{"abs-rel": None, "toggle-state": None, "zero": None}  for _ in range(5)]
         
 
-        self.monitor_text_list = ['Roll :', 'Pitch :', 'Yaw :', 'Vane :', 'Wing :']
-        self.monitor_label_list = []
-        self.monitor_value_label_list = []
-        self.abs_rel_toggle_buttons_list = []
-        self.zero_buttons_list = []
-
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
         #--------------------------------------------AGAIN USING A FOR LOOP TO AVOID BIG BLOCK OF REPEATING CODE--------------------------------------------
@@ -375,14 +376,10 @@ class Application(tk.Tk):
             y = (0.05+i*0.11)
             self.monitor_label = tk.Label(self.monitor_canvas, text=config["text"], font=Helvetica_11_bold, bg = self.colors["white"], anchor='e')
             self.monitor_label.place(anchor='n', relx=0.13, rely=y, relwidth=0.11, relheight=0.06)  
-            self.monitor_label_list.append(self.monitor_label)
 
             self.monitor_value_label = tk.Label(self.monitor_canvas, text=str(config["default"]), font=Helvetica_11_bold, bg=self.colors["light grey"], justify='center', relief='groove')
             self.monitor_value_label.place(anchor='n', relx=0.45, rely=y, relwidth=0.45, relheight=0.06)
             self.monitor_values[i]["widget"] = self.monitor_value_label
-
-            # like the vane/servo tab, store the monitor tab's label widgets in a list to access them individually with ease 
-            self.monitor_value_label_list.append(self.monitor_value_label)
 
             self.abs_rel_toggle_button = tk.Button(self.monitor_canvas, text='Abs', font=Helvetica_11_bold, bg=self.colors["light grey"])
             self.abs_rel_toggle_button.configure(relief='groove', command=lambda x = self.abs_rel_toggle_button : self.abs_rel_toggle_button_func(x))
@@ -398,13 +395,10 @@ class Application(tk.Tk):
             self.zero_button.place(anchor='n', relx=0.88, rely=y, relwidth=0.1, relheight=0.06)
             self.monitor_buttons[i]["zero"] = self.zero_button
             
-            self.abs_rel_toggle_buttons_list.append(self.abs_rel_toggle_button)
-            self.zero_buttons_list.append(self.zero_button)
-
             self.monitor_buttons[i]["toggle-state"] = self.monitor_buttons[i]["abs-rel"]["text"]
             self.monitor_values[i]["zero-rel-val"] = 0
 
-        for i in range(len(self.monitor_text_list)):
+        for i in range(5):
             y = (0.135+i*0.11)
             self.valSeparator = ttk.Separator(self.monitor_canvas)
             self.valSeparator.place(anchor='n', relx=0.5, rely=y, relwidth=0.8)
@@ -462,9 +456,11 @@ class Application(tk.Tk):
         self.record_toggle_but.bind('<Leave>', lambda event, x=self.record_toggle_but : self.on_hover_leave(x))
         self.record_toggle_but.place(anchor='n', relx=0.813, rely=0.85, relwidth=0.3, relheight=0.07)
 
+        self.default_servo_speed = self.s.return_default_servo_speed()
+        self.servo_speed_scale.set(self.default_servo_speed)
+
 
     def button_press(self, parent):
-        print("pressed")
         self.button_is_pressed = True
         if self.s.connected:
             if parent == self.jog_plus_button:
@@ -474,7 +470,6 @@ class Application(tk.Tk):
 
 
     def button_release(self, parent):
-        print("released")
         self.button_is_pressed = False
         if self.s.connected:
             if parent == self.jog_plus_button:
@@ -672,7 +667,7 @@ class Application(tk.Tk):
                 except:
                     #create thread for graphing - avoiding laggy interface with threading
                     print('creating process for graph...')
-                    self.graph_thread = threading.Thread(target = self.animation_thread)
+                    self.graph_thread = threading.Thread(target=self.animation_thread)
                     self.graph_thread.daemon = True
                     self.graph_thread.start()
             else:
@@ -745,8 +740,8 @@ class Application(tk.Tk):
 
     def gyro_calibration_button_func(self):
         if self.s.connected:
-            yes_no_msg = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the gyro sensor.\nAre you sure?')
-            if yes_no_msg == 'yes':
+            confirm = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the gyro sensor.\nAre you sure?')
+            if confirm == 'yes':
                 self.s.send('acccal')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')    
@@ -754,8 +749,8 @@ class Application(tk.Tk):
 
     def magnetometer_calibration_button_func(self):
         if self.s.connected:
-            yes_no_msg = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the magnetometer sensor.\nAre you sure?')
-            if yes_no_msg == 'yes':
+            confirm = tk.messagebox.askquestion(title='WARNING', message='You are about to calibrate the magnetometer sensor.\nAre you sure?')
+            if confirm == 'yes':
                 self.s.send('magcal')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')  
@@ -763,8 +758,8 @@ class Application(tk.Tk):
 
     def format_button_func(self):
         if self.s.connected:
-            yes_no_msg = tk.messagebox.askquestion(title='WARNING', message='You are about to format the SD card.\nAre you sure?')
-            if yes_no_msg == 'yes':
+            confirm = tk.messagebox.askquestion(title='WARNING', message='You are about to format the SD card.\nAre you sure?')
+            if confirm == 'yes':
                 self.s.send('format')
         else:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')  
@@ -828,22 +823,29 @@ class Application(tk.Tk):
         widget.configure(bg=init_color)
 
 
+    #/////////////////////////////////////////////////////////////////////////////////
+    # ///////////////////////////////// THREADING ////////////////////////////////////
+    #/////////////////////////////////////////////////////////////////////////////////
+
     #function creating a thread continuously reading data from the serial port
     def read_serial_thread(self):
-        self.read_serial_t = threading.Thread(target=self.read_serial)
-        self.read_serial_t.daemon = True
-        self.read_serial_t.start()
+        if not self.reading_thread:
+            self.read_serial_t = threading.Thread(target=self.read_serial_loop)
+            self.read_serial_t.daemon = True
+            self.read_serial_t.start()
+        else:
+            print("cant open thread when it is already in use")
 
 
 
     #function checking connection state and using serialComms module to receive data
-    def read_serial(self):
-        while self.s.connected and self.current_tab in self.tabs_to_be_updated:
-            self.s.recv()
+    def read_serial_loop(self):
+        while self.s.connected and self.current_tab in [1, 2]:
+            self.s.recv(collect=True)
             time.sleep(0.0001)
             self.reading_thread = True
         self.reading_thread = False
-            
+        print("EXITING READ SERIAL THREAD")
 
 
     def wait_for_thread_to_close(self):
@@ -856,28 +858,24 @@ class Application(tk.Tk):
     # ********* check out if REL / ABS / ZERO stuff still works - doubt it
     def monitor_thread_loop(self):
         while self.s.connected and self.current_tab == 1:
+            time.sleep(0.1)
             try:             
-                self.s.recv(collect=True)
-                graph_data = self.s.return_graph_data()
-                print(f'graph data:\n{graph_data}')
-                values = [item[len(item)-1] for item in graph_data]    
-                for index, (val_label, value) in enumerate(zip(self.monitor_value_label_list, values)):
-                    if index == 4:
-                        if self.abs_rel_states_list[index] == 'Abs':
-                            val_label['text'] = str(round(-value , 2))
-                        elif self.abs_rel_states_list[index] == 'Rel':
-                            val_label['text'] = str(round( (-value - self.rel_zero_values_list[index]) , 2))
+                dat, _ = self.s.return_graph_data()
+                values = [item[len(item)-1] for item in dat]    
+                for idx, (widget, value) in enumerate(zip(self.monitor_values, values)):
+                    if idx == 4:
+                        if self.monitor_buttons[idx]["toggle-state"] == "Abs":
+                            widget["widget"]["text"] = str(round(-value, 2))
+                        elif self.monitor_buttons[idx]["toggle-state"] == "Rel":
+                            widget["widget"]["text"] = str(round( (-value - widget["zero-rel-val"]), 2))
                         continue
-                    if self.abs_rel_states_list[index] == 'Abs':
-                        val_label['text'] = str(round(value, 2))
-                    elif self.abs_rel_states_list[index] == 'Rel':
-                        val_label['text'] = str(round(value - self.rel_zero_values_list[index], 2))
+                    if self.monitor_buttons[idx]["toggle-state"] == "Abs":
+                        widget["widget"]["text"] = str(round(value, 2))
+                    elif self.monitor_buttons[idx]["toggle-state"] == "Rel":
+                        widget["widget"]["text"] = str(round(value - widget["zero-rel-val"], 2))
             except Exception as e:
                 print(f'error on update_monitor_gui... {e}')
         print("EXITING MONITOR THREAD...")
-
-
-
 
 
     # function updating the gui when 'graph' tab is currently open
@@ -887,49 +885,43 @@ class Application(tk.Tk):
             # either plot or read serial, not both at the same time / avoid crashes
             while self.s.is_reading_serial == True:
                 time.sleep(0.001)
-
-            graph_data = self.s.return_graph_data()
-            t_count_array = list(self.s.return_t_count_array())
+            dat, t_count_arr = self.s.return_graph_data()
+            t_count_arr = list(t_count_arr)
             # plot the values
-            for i, item in enumerate(graph_data):
-                self.ax.plot(t_count_array, item, self.graph_color_list[i])
+            for i, item in enumerate(dat):
+                self.ax.plot(t_count_arr, item, self.graph_color_list[i])
             self.ax.grid()
-
         except Exception as e:
             print(f'update_graph_gui exception : {e}')
  
+    #/////////////////////////////////////////////////////////////////////////////////
+    #////////////////////////////////// THREADING ////////////////////////////////////
+    #/////////////////////////////////////////////////////////////////////////////////
 
-    # FUNCTION CALLED EVERY TIME THE USER SWITCHES TABS - KEEPS TRACK OF CURRENT AND PREVIOUS TAB,
-    # SENDING APPROPRIATE VMON COMMAND TO DISPLAY CORRECT VALUES DEPENING ON THE CURRENT TAB 
+
     def on_tab_switch(self, event):
         try:
             self.current_tab = self.tab_parent.index(self.tab_parent.select())
-
             # arriving in an updating tab, coming from a non updating one > request data
             if self.current_tab in [1, 2] and self.previous_tab not in [1, 2]:
-                if self.s.connected:
-                    self.s.send("vmon 8 100")
-                time.sleep(0.05)
-                self.handle_tabs()
+                pass
             # arriving on non updating-static tab
             elif self.current_tab in [0, 3, 4]:
                 self.wait_for_thread_to_close()
-                self.s.send('vmon 0 0')
+                if self.current_tab == 0:
+                    self.update_tuning_values()
 
-            if self.current_tab == 0:
-                self.wait_for_thread_to_close()
-                self.update_tuning_values()
-
-            # update previous tab to current tab on tab switch
             self.previous_tab = self.current_tab
-        except:
-            print("TAB_SWITCH ERROR")
+            self.handle_tabs()
+            # update previous tab to current tab on tab switch
+        except Exception as e:
+            print(f"TAB_SWITCH ERROR: {e}")
 
 
 
-
-
-
+    #/////////////////////////////////////////////////////////////////////////////////
+    # ////////////////////////////// CONFIG READ-WRITE ///////////////////////////////
+    #/////////////////////////////////////////////////////////////////////////////////
 
 
     # write to the config file 
@@ -951,13 +943,56 @@ class Application(tk.Tk):
             file.write(save)
 
 
+    # ********** jesus christ re-write this
+    '''
+    def read_last_config(self):   
+        with open('files\config.txt', 'r') as file:
+            lines = [x.strip() for x in file.readlines()]
+            for line in lines:
+                if "DEFAULT_COM" in line:
+                    self.default_com = line.replace("DEFAULT_COM", '').replace(' ', '').replace('=', '')
+                elif "DEFAULT_BAUD" in line:
+                    self.default_baud = line.replace("DEFAULT_BAUD", '').replace(' ', '').replace('=', '')
+                    self.default_baud = int(self.default_baud)
+            
+                elif "GRAPH_DISPLAY_LAST_X_SECONDS" in line:
+                    tmp = line.replace("GRAPH_DISPLAY_LAST_X_SECONDS", '').replace(' ', '').replace('=', '')
+                    tmp = float(tmp)
+                    self.x_limit = tmp * 10
+                elif "DEFAULT_SERVO_SPEED" in line:
+                    self.default_servo_speed = line.replace("DEFAULT_SERVO_SPEED", "").replace(' ', '').replace('=', '')
+                    self.default_servo_speed = int(self.default_servo_speed)
+                elif "ZERO" in line:
+                    val = float(line.split('/')[1].split('=')[1])
+                    abs_rel_state = 'Abs' if 'ABS' in line.split('/')[0] else 'Rel'
+                    if "ROLL" in line:
+                        self.abs_rel_toggle_states[0] = abs_rel_state
+                        self.rel_zero_values_list[0] = val
+                    elif "PITCH" in line:
+                        self.abs_rel_toggle_states[1] = abs_rel_state
+                        self.rel_zero_values_list[1] = val
+                    elif "YAW" in line:
+                        self.abs_rel_toggle_states[2] = abs_rel_state
+                        self.rel_zero_values_list[2] = val
+                    elif "VANE" in line:
+                        self.abs_rel_toggle_states[3] = abs_rel_state
+                        self.rel_zero_values_list[3] = val
+                    elif "WING" in line:
+                        self.abs_rel_toggle_states[4] = abs_rel_state
+                        self.rel_zero_values_list[4] = val
+    '''
+    #/////////////////////////////////////////////////////////////////////////////////
+    # ////////////////////////////// CONFIG READ-WRITE ///////////////////////////////
+    #/////////////////////////////////////////////////////////////////////////////////
+
 
 
     # run upon exiting the app - handle serial connection
     # run the write_to_config function to save
     def exit(self):
         self.cleanup_serial()
-        self.write_to_config()
+        # ********* re-add when its fixed
+        #self.write_to_config()
         self.quit()
         self.destroy()
 

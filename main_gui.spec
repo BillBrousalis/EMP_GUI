@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['main_gui.py'],
-             pathex=['C:\\work\\python\\executables\\emp\\FINAL_cleanup'],
+             pathex=['C:\\work\\python\\executables\\emp\\final_ultra_cleanup'],
              binaries=[],
              datas=[],
              hiddenimports=[],
@@ -30,4 +30,4 @@ exe = EXE(pyz,
           upx=True,
           upx_exclude=[],
           runtime_tmpdir=None,
-          console=False , icon='files\\pictures-icon\\boat_icon.ico')
+          console=False )

@@ -12,12 +12,14 @@ class SerialClass():
     x_limit = 50    # seconds to display in the X axis
     
     #------------------------------------------INITIALIZING------------------------------------------
-    def __init__(self):
+    def __init__(self, com=None, baud=None):
         super().__init__()
         self.connected = False
         self.baud_rate_list = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 76800, 115200]
-        self.COM = 'COM16'
-        self.BAUD = self.baud_rate_list[-1]
+        if com is None:
+            self.COM = 'COM16'
+        if baud is None:
+            self.BAUD = self.baud_rate_list[-1]
 
         self.time_start = time.time()
 
@@ -197,11 +199,12 @@ class SerialClass():
 
     # flush the serial
     def serialFlush(self):
-        self.ser.flush()
+        if self.ser is not None:
+            self.ser.flush()
 
     # return the graph data collected
     def return_graph_data(self):
-        return self.graph_data
+        return (self.graph_data, self.t_count_array)
     
     def return_t_count_array(self):
         return self.t_count_array

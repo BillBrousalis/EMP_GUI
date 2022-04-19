@@ -2,7 +2,7 @@
 import serial
 import tkinter as tk
 import tkinter.font as tkFont
-from tkinter import ttk
+from tkinter import Toplevel, ttk
 import tkinter.messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -422,10 +422,12 @@ class Application(tk.Tk):
         self.record_toggle_but.configure(command=self.record_toggle_but_func)
         self.record_toggle_but.bind('<Enter>', lambda event, x=self.record_toggle_but : self.on_hover(x))
         self.record_toggle_but.bind('<Leave>', lambda event, x=self.record_toggle_but : self.on_hover_leave(x))
-        self.record_toggle_but.place(anchor='n', relx=0.813, rely=0.85, relwidth=0.3, relheight=0.07)
+        self.record_toggle_but.place(anchor='n', relx=0.84, rely=0.85, relwidth=0.25, relheight=0.07)
 
         self.default_servo_speed = self.s.return_default_servo_speed()
         self.servo_speed_scale.set(self.default_servo_speed)
+
+
 
 
     def button_press(self, parent):
@@ -541,6 +543,7 @@ class Application(tk.Tk):
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')
 
 
+
     #--------------------------------------------CREATING THE 'GRAPH' TAB USING MATPLOTLIB FIGURES--------------------------------------------
     def create_graph_tab(self):
         self.graph_data = self.s.data
@@ -654,7 +657,6 @@ class Application(tk.Tk):
         self.ani._start()
 
 
-
 #--------------------------------------------CREATING THE 'SETTINGS' TAB --------------------------------------------
     def create_calib_tab(self):
         self.settings_tab = ttk.Frame(self.tab_parent)
@@ -662,32 +664,71 @@ class Application(tk.Tk):
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
-        self.settings_canvas = tk.Canvas(self.settings_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
-        self.settings_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
+        canvas = tk.Canvas(self.settings_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
+        canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
-
-        self.settings_info_label = tk.Label(self.settings_canvas, text='< testing >', font=Helvetica_11_bold, justify='center', relief='groove')
+        self.settings_info_label = tk.Label(canvas, text='< testing >', font=Helvetica_11_bold, justify='center', relief='groove')
         self.settings_info_label.place(anchor='n', relx=0.7, rely=0.02, relwidth=0.5, relheight=0.7)
 
-        self.gyro_calibration_button = tk.Button(self.settings_canvas, text='Start Gyro\nCalibration', font=Helvetica_11_bold, bg=self.colors["light grey"],
+        self.gyro_calibration_button = tk.Button(canvas, text='Start Gyro\nCalibration', font=Helvetica_11_bold, bg=self.colors["light grey"],
             relief='groove', command=self.gyro_calibration_button_func)
         self.gyro_calibration_button.bind('<Enter>', lambda event, x=self.gyro_calibration_button : self.on_hover(x))
         self.gyro_calibration_button.bind('<Leave>', lambda event, x=self.gyro_calibration_button : self.on_hover_leave(x))
         self.gyro_calibration_button.place(anchor='n', relx=0.25, rely=0.05, relwidth=0.31, relheight=0.1)
 
-
-        self.magnetometer_calibration_button = tk.Button(self.settings_canvas, text='Start Magnetometer\nCalibration', font=Helvetica_11_bold,
+        self.magnetometer_calibration_button = tk.Button(canvas, text='Start Magnetometer\nCalibration', font=Helvetica_11_bold,
             bg=self.colors["light grey"], relief='groove', command=self.magnetometer_calibration_button_func)
         self.magnetometer_calibration_button.bind('<Enter>', lambda event, x=self.magnetometer_calibration_button : self.on_hover(x))
         self.magnetometer_calibration_button.bind('<Leave>', lambda event, x=self.magnetometer_calibration_button : self.on_hover_leave(x))
         self.magnetometer_calibration_button.place(anchor='n', relx=0.25, rely=0.2, relwidth=0.31, relheight=0.1)
 
-
-        self.format_button = tk.Button(self.settings_canvas, text='Start Formatting\nSD Card', font=Helvetica_11_bold,
+        self.format_button = tk.Button(canvas, text='Start Formatting\nSD Card', font=Helvetica_11_bold,
             bg=self.colors["light grey"], relief='groove', command=self.format_button_func)
         self.format_button.bind('<Enter>', lambda event, x=self.format_button : self.on_hover(x))
         self.format_button.bind('<Leave>', lambda event, x=self.format_button : self.on_hover_leave(x))
         self.format_button.place(anchor='n', relx=0.25, rely=0.35, relwidth=0.31, relheight=0.1)
+
+        self.get_logs_but = tk.Button(canvas, text='access log\nfiles', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
+        self.get_logs_but.configure(command=self.get_logs_but_func)
+        self.get_logs_but.bind('<Enter>', lambda event, x=self.get_logs_but : self.on_hover(x))
+        self.get_logs_but.bind('<Leave>', lambda event, x=self.get_logs_but : self.on_hover_leave(x))
+        self.get_logs_but.place(anchor='n', relx=0.25, rely=0.5, relwidth=0.31, relheight=0.1)
+
+
+    def get_logs_but_func(self):
+        self.s.serialFlush()
+        self.s.send("getlist")
+        list = self.s.read_all().split("\n")
+        list = [x for x in list if x not in ["\n", ""]]
+        print(f"LOGS:\n{list}")
+        self.nw = Toplevel(self)
+        self.nw.geometry("500x600")
+        self.nw.title("--Saved Log Files--")
+        self.nw.protocol("WM_DELETE_WINDOW", self.nw_exit)
+        v = tk.StringVar(self.nw, "1")
+        d = {key:val for (key,val) in zip(list, [i for i in range(1,len(list)+1)])}
+        col = 0
+        for r, (txt, val) in enumerate(d.items()):
+            if (r+1) % 20 == 0:
+                col += 1
+                r = 0
+            rb = tk.Radiobutton(self.nw, text=txt, variable=v, value=val)
+            rb.place(anchor='n', relx=(0.15+col*0.2), rely=(0.01+0.045*r), relwidth=0.25, relheight=0.05)
+        self.dlbut = tk.Button(self.nw, text='Access Log\nFiles', bg=self.colors["light grey"], relief='groove')
+        self.dlbut.configure(command=self.pepega)
+        self.dlbut.bind('<Enter>', lambda event, x=self.dlbut : self.on_hover(x))
+        self.dlbut.bind('<Leave>', lambda event, x=self.dlbut : self.on_hover_leave(x))
+        self.dlbut.place(anchor='n', relx=0.5, rely=0.95, relwidth=0.3, relheight=0.05)
+
+
+    def pepega(self):
+        print("pepega")
+
+
+    def nw_exit(self):
+        print("NW exit!")
+        self.nw.quit()
+        self.nw.destroy()
 
 
     def gyro_calibration_button_func(self):
@@ -725,18 +766,18 @@ class Application(tk.Tk):
         Helvetica_11 = tkFont.Font(family='Helvetica', size=11)
         Helvetica_12 = tkFont.Font(family='Helvetica', size=12)
 
-        self.about_canvas = tk.Canvas(self.about_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
-        self.about_canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
+        canvas = tk.Canvas(self.about_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
+        canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
         image = Image.open('files\pictures-icon\invibit_logo.png')
         image = image.resize((250, 90), Image.ANTIALIAS)
         image = ImageTk.PhotoImage(image)
-        self.about_canvas.create_image(self.WIDTH/2, 30, anchor='n', image=image) 
-        self.about_canvas.image = image
+        canvas.create_image(self.WIDTH/2, 30, anchor='n', image=image) 
+        canvas.image = image
 
         # Text(master, height=1, borderwidth=0)
 
-        self.url = tk.Text(self.about_canvas, height=1, font=Helvetica_12, bg=self.colors["white"], borderwidth=0, cursor="hand2")
+        self.url = tk.Text(canvas, height=1, font=Helvetica_12, bg=self.colors["white"], borderwidth=0, cursor="hand2")
         self.url.bind('<Button-1>', lambda event, x=self.url: self.open_link(x))
         self.url.insert('1.0', 'https://www.invibit.com/')
         self.url.configure(state='disabled')
@@ -744,13 +785,13 @@ class Application(tk.Tk):
 
         contact_info_text = "phone: (+30) 210 4212380\nmail: info@invibit.com"
 
-        self.contact_info_label = tk.Text(self.about_canvas, height=1, font=Helvetica_11, borderwidth=0, bg=self.colors["white"])
+        self.contact_info_label = tk.Text(canvas, height=1, font=Helvetica_11, borderwidth=0, bg=self.colors["white"])
         self.contact_info_label.insert('1.0', contact_info_text)
         self.contact_info_label.configure(state='disabled')
         self.contact_info_label.place(anchor='n', relx=0.5, rely=0.38, relwidth=0.36, relheight=0.1)
 
         # Firmware version at the bottom of the page
-        self.firmware_version_label = tk.Label(self.about_canvas, text='version : (connect to view firmware version)', bg=self.colors["white"], font=self.font +'11')
+        self.firmware_version_label = tk.Label(canvas, text='version : (connect to view firmware version)', bg=self.colors["white"], font=self.font +'11')
         self.firmware_version_label.place(anchor='n', relx=0.65, rely=0.93)
 
 
@@ -759,8 +800,6 @@ class Application(tk.Tk):
         url = label.get('1.0', 'end')
         print('url = ', url)
         webbrowser.open_new(url)
-
-
 
 
     #----------------------------------------------------------------------------------------------------------------
@@ -805,7 +844,6 @@ class Application(tk.Tk):
 
 
     # function updating the gui when 'monitor' tab is currently open
-    # ********* check out if REL / ABS / ZERO stuff still works - doubt it
     def monitor_thread_loop(self):
         while self.s.connected and self.current_tab == 1:
             time.sleep(0.1)
@@ -824,7 +862,7 @@ class Application(tk.Tk):
                     elif self.monitor_buttons[idx]["toggle-state"] == "Rel":
                         widget["widget"]["text"] = str(round(value - widget["zero-rel-val"], 2))
             except Exception as e:
-                print(f'error on update_monitor_gui... {e}')
+                print(f'error on update_monitor_gui: {e}')
         print("EXITING MONITOR THREAD...")
 
 

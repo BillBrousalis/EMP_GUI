@@ -87,39 +87,27 @@ class SerialClass():
         if self.connected:
             try:
                 rec = self.ser.readline().decode()
+                print(rec)
                 if isjson:
                     rec = json.loads(rec)
                 if collect:
                     self.collect_data(rec)
                 return rec
             except Exception as e:
-                print(f'error in receive {e}')
+                print(f'error in receive -> {e}')
         else:
             print('Not connected')
 
-       
 
-    '''
-    # read data available to the serial port
-    def receive(self): 
-        if self.connected == True and self.ser != None:
+    def recvuntil(self, x):
+        if self.connected:
             try:
-                self.is_reading_serial = True
-                self.received = self.ser.readline().decode()
-                self.received = json.loads(self.received)
-                if self.quat == False:
-                    self.collect_data()
-                else:
-                    # check that we are not getting dump1 data
-                    if "offs" not in self.received:
-                        self.is_reading_serial = False
-                        return self.received
-                    else:
-                        print(f'faulty json received... <receive_data> : {self.received}')
+                self.ser.read_until(x.encode())
             except Exception as e:
-                print(f"receive_data error : {e}")
-    '''
-                
+                print(f'error in recvuntil: {e}')
+        else:
+            print('Not connected')
+
 
     # if quat is false, collect data in an organized matter for 
     # use in the 'monitor' tab as well as the graph
@@ -146,17 +134,21 @@ class SerialClass():
         self.is_reading_serial = False
 
 
-
-
     def toggle_record(self, state):
         if self.connected == True:
             if state == 'on':
                 self.send("recstart")
+                self.recvuntil(".csv")
+                self.send("vmon 8 100")
             else:
                 self.send("recstop")
-    
-             
+                self.recvuntil("Closing..")
+                self.send("vmon 8 100")
+            
 
+    def read_all(self):
+        if self.connected:
+            return self.ser.readall().decode()
 
     # flush the serial
     def serialFlush(self):
@@ -182,8 +174,6 @@ class SerialClass():
         self.t_count_array.clear() 
         self.graph_data = [[] for i in range(self.number_of_graph_values)]
         self.data.clear()
-
-
 
 
     # check for avaiable ports

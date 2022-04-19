@@ -70,7 +70,7 @@ class Application(tk.Tk):
         self.tabs = [{'name': 'Tuning', 'thread': False},
                      {'name': 'Monitor', 'thread': True},
                      {'name': 'Graphing', 'thread': True},
-                     {'name': 'Calibration', 'thread': False},
+                     {'name': 'Advanced', 'thread': False},
                      {'name': 'About', 'thread': False}]
 
         self.create_tuning_tab()
@@ -688,14 +688,19 @@ class Application(tk.Tk):
         self.format_button.bind('<Leave>', lambda event, x=self.format_button : self.on_hover_leave(x))
         self.format_button.place(anchor='n', relx=0.25, rely=0.35, relwidth=0.31, relheight=0.1)
 
-        self.get_logs_but = tk.Button(canvas, text='access log\nfiles', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
+        self.get_logs_but = tk.Button(canvas, text='Access Log\nFiles', font=Helvetica_11_bold, bg=self.colors["light grey"], relief='groove')
         self.get_logs_but.configure(command=self.get_logs_but_func)
         self.get_logs_but.bind('<Enter>', lambda event, x=self.get_logs_but : self.on_hover(x))
         self.get_logs_but.bind('<Leave>', lambda event, x=self.get_logs_but : self.on_hover_leave(x))
         self.get_logs_but.place(anchor='n', relx=0.25, rely=0.5, relwidth=0.31, relheight=0.1)
+        self.nw = None
 
 
     def get_logs_but_func(self):
+        if self.nw is not None: return None
+        if not self.s.connected:
+            tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')    
+            return None
         self.s.serialFlush()
         self.s.send("getlist")
         list = self.s.read_all().split("\n")
@@ -703,32 +708,70 @@ class Application(tk.Tk):
         print(f"LOGS:\n{list}")
         self.nw = Toplevel(self)
         self.nw.geometry("500x600")
+        self.nw.minsize(500,600)
         self.nw.title("--Saved Log Files--")
         self.nw.protocol("WM_DELETE_WINDOW", self.nw_exit)
-        v = tk.StringVar(self.nw, "1")
-        d = {key:val for (key,val) in zip(list, [i for i in range(1,len(list)+1)])}
-        col = 0
-        for r, (txt, val) in enumerate(d.items()):
-            if (r+1) % 20 == 0:
+        self.fname_select = tk.StringVar(self.nw, "1")
+        self.files = {key:val for (key,val) in zip([i for i in range(1,len(list)+1)], list)}
+        row, col = 0, 0
+        for (val, fname) in self.files.items():
+            if (row+1) % 21 == 0:
                 col += 1
-                r = 0
-            rb = tk.Radiobutton(self.nw, text=txt, variable=v, value=val)
-            rb.place(anchor='n', relx=(0.15+col*0.2), rely=(0.01+0.045*r), relwidth=0.25, relheight=0.05)
-        self.dlbut = tk.Button(self.nw, text='Access Log\nFiles', bg=self.colors["light grey"], relief='groove')
-        self.dlbut.configure(command=self.pepega)
+                row = 0
+            print(row, col)
+            rb = tk.Radiobutton(self.nw, text=f'{fname}', variable=self.fname_select, value=val)
+            rb.place(anchor='n', relx=(0.14+col*0.25), rely=(0.01+0.047*row), relwidth=0.25, relheight=0.05)
+            row += 1
+        self.dlbut = tk.Button(self.nw, text='Download', bg=self.colors["light grey"], relief='groove')
+        self.dlbut.configure(command=self.downloadfile)
         self.dlbut.bind('<Enter>', lambda event, x=self.dlbut : self.on_hover(x))
         self.dlbut.bind('<Leave>', lambda event, x=self.dlbut : self.on_hover_leave(x))
-        self.dlbut.place(anchor='n', relx=0.5, rely=0.95, relwidth=0.3, relheight=0.05)
+        self.dlbut.place(anchor='n', relx=0.35, rely=0.95, relwidth=0.3, relheight=0.05)
+
+        self.dlallbut = tk.Button(self.nw, text='Download ALL', bg=self.colors["light grey"], relief='groove')
+        self.dlallbut.configure(command=self.downloadall)
+        self.dlallbut.bind('<Enter>', lambda event, x=self.dlallbut : self.on_hover(x))
+        self.dlallbut.bind('<Leave>', lambda event, x=self.dlallbut : self.on_hover_leave(x))
+        self.dlallbut.place(anchor='n', relx=0.65, rely=0.95, relwidth=0.3, relheight=0.05)
 
 
-    def pepega(self):
-        print("pepega")
+    def downloadfile(self):
+        if self.s.connected:
+            fname = self.files[int(self.fname_select.get())]
+            path = f"/logs/{fname}"
+            print(f"Download: {path}")
+            self.s.send(f"getfile {path}")
+            try:
+                dat = f"bytes: {self.s.read_all()}"
+                with open(f"downloaded_logs\{fname}", 'w') as f:
+                    f.write(dat)
+                tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs.')    
+            except Exception as e:
+                tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
+        else:
+            print('Connection Error')
+
+
+    def downloadall(self):
+        if self.s.connected:
+            for fname in self.files.values():
+                path = f"/logs/{fname}"
+                print(f"Download: {path}")
+                self.s.send(f"getfile {path}")
+                try:
+                    dat = f"bytes: {self.s.read_all()}"
+                    with open(f"downloaded_logs\{fname}", 'w') as f:
+                        f.write(dat)
+                except Exception as e:
+                    tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
+            tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in downloaded_logs folder.')    
+        else:
+            print('Connection Error')
 
 
     def nw_exit(self):
-        print("NW exit!")
-        self.nw.quit()
         self.nw.destroy()
+        self.nw = None
 
 
     def gyro_calibration_button_func(self):
@@ -890,6 +933,9 @@ class Application(tk.Tk):
     def on_tab_switch(self, event):
         try:
             self.current_tab = self.tab_parent.index(self.tab_parent.select())
+            if self.current_tab != 2:
+                if self.start_graph_button['text'] == "Stop Graph":
+                    self.start_graph_button_func()
             # arriving in an updating tab, coming from a non updating one > request data
             if self.current_tab in [1, 2] and self.previous_tab not in [1, 2]:
                 pass

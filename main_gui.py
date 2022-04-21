@@ -629,7 +629,6 @@ class Application(tk.Tk):
                     self.ani.event_source.start()
                 except:
                     #create thread for graphing - avoiding laggy interface with threading
-                    print('creating process for graph...')
                     self.graph_thread = threading.Thread(target=self.animation_thread)
                     self.graph_thread.daemon = True
                     self.graph_thread.start()
@@ -718,7 +717,6 @@ class Application(tk.Tk):
             if (row+1) % 21 == 0:
                 col += 1
                 row = 0
-            print(row, col)
             rb = tk.Radiobutton(self.nw, text=f'{fname}', variable=self.fname_select, value=val)
             rb.place(anchor='n', relx=(0.14+col*0.25), rely=(0.01+0.047*row), relwidth=0.25, relheight=0.05)
             row += 1
@@ -739,7 +737,6 @@ class Application(tk.Tk):
         if self.s.connected:
             fname = self.files[int(self.fname_select.get())]
             path = f"/logs/{fname}"
-            print(f"Download: {path}")
             self.s.send(f"getfile {path}")
             try:
                 dat = f"bytes: {self.s.read_all()}"
@@ -756,7 +753,6 @@ class Application(tk.Tk):
         if self.s.connected:
             for fname in self.files.values():
                 path = f"/logs/{fname}"
-                print(f"Download: {path}")
                 self.s.send(f"getfile {path}")
                 try:
                     dat = f"bytes: {self.s.read_all()}"
@@ -841,7 +837,6 @@ class Application(tk.Tk):
     # small function to open url link provided in the 'about' tab
     def open_link(self, label):
         url = label.get('1.0', 'end')
-        print('url = ', url)
         webbrowser.open_new(url)
 
 

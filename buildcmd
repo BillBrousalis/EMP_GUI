@@ -1,2 +1,2 @@
 build:
-	pyinstaller --onefile --windowed main_gui.py
+	pyinstaller --onefile --windowed --icon='files/pictures-icon/boat_icon.ico' main_gui.py

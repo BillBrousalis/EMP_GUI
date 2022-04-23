@@ -726,25 +726,19 @@ class Application(tk.Tk):
         self.dlbut.bind('<Leave>', lambda event, x=self.dlbut : self.on_hover_leave(x))
         self.dlbut.place(anchor='n', relx=0.16, rely=0.95, relwidth=0.3, relheight=0.05)
 
-        self.dlallbut = tk.Button(self.nw, text='Download ALL', bg=self.colors["light grey"], relief='groove')
-        self.dlallbut.configure(command=self.downloadall)
-        self.dlallbut.bind('<Enter>', lambda event, x=self.dlallbut : self.on_hover(x))
-        self.dlallbut.bind('<Leave>', lambda event, x=self.dlallbut : self.on_hover_leave(x))
-        self.dlallbut.place(anchor='n', relx=0.46, rely=0.95, relwidth=0.3, relheight=0.05)
-
-        self.progresslb = tk.Label(self.nw, text='File 100/100: 100%', bg=self.colors["white"])
-        self.progresslb.place(anchor='n', relx=0.8, rely=0.955)
+        self.progresslb = tk.Label(self.nw, text='Download [%]', bg=self.colors["white"])
+        self.progresslb.place(anchor='n', relx=0.6, rely=0.955)
         self.download_thread = None
 
-    def set_progress(self, fn, tf, perc):
-        self.progresslb['text'] = f'File {fn}/{tf}: {perc}%'
+    def set_progress(self, perc):
+        self.progresslb['text'] = f'Download [{perc}%]'
 
     def start_download_thread(self, fname, fn, tf):
-        self.download_thread = threading.Thread(target=self.download_loop, args=(fname, fn, tf))
+        self.download_thread = threading.Thread(target=self.download_loop, args=(fname,))
         self.download_thread.daemon = True
         self.download_thread.start()
 
-    def download_loop(self, fname, fn, tf):
+    def download_loop(self, fname):
         try:
             dat = ''
             self.s.send(f"getfile /logs/{fname}")
@@ -755,10 +749,12 @@ class Application(tk.Tk):
                 if size-len(dat) < step:
                     step = size-len(dat)
                 dat += self.s.recv(step)
-                self.set_progress(fn, tf, x)
+                self.set_progress(x)
             x = 100
-            self.set_progress(fn, tf, x)
-            assert len(dat) == size
+            self.set_progress(x)
+            if len(dat) != size:
+                tk.messagebox.showinfo(title='Error', message='Error during download.')    
+                return None
             with open(f"downloaded_logs\{fname}", 'w') as f:
                 f.write(dat)
             tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs folder.')    
@@ -770,48 +766,7 @@ class Application(tk.Tk):
     def downloadfile(self):
         if self.s.connected:
             fname = self.files[int(self.fname_select.get())]
-<<<<<<< HEAD
             self.start_download_thread(fname, 1, 1)
-=======
-            path = f"/logs/{fname}"
-            self.s.send(f"getfile {path}")
-            try:
-                dat = f"bytes: {self.s.read_all()}"
-                with open(f"downloaded_logs\{fname}", 'w') as f:
-                    f.write(dat)
-                tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs.')    
-            except Exception as e:
-                tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
->>>>>>> c8fc73fd3ec996e97ad78a5adafc3515644bb2c9
-        else:
-            print('Connection Error')
-
-
-    def downloadall(self):
-        if self.s.connected:
-<<<<<<< HEAD
-            tf = len(self.files)
-            try:
-                for idx, fname in enumerate(self.files.values()):
-                    if self.download_thread is not None:
-                        while self.download_thread.is_alive():
-                            time.sleep(0.5)
-                    self.start_download_thread(fname, idx, tf)
-                tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in /downloaded_logs folder.')    
-            except Exception as e:
-                print(f'error in downloadall: {e}')
-=======
-            for fname in self.files.values():
-                path = f"/logs/{fname}"
-                self.s.send(f"getfile {path}")
-                try:
-                    dat = f"bytes: {self.s.read_all()}"
-                    with open(f"downloaded_logs\{fname}", 'w') as f:
-                        f.write(dat)
-                except Exception as e:
-                    tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
-            tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in downloaded_logs folder.')    
->>>>>>> c8fc73fd3ec996e97ad78a5adafc3515644bb2c9
         else:
             print('Connection Error')
 

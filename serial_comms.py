@@ -82,8 +82,18 @@ class SerialClass():
             print("Connect to a serial port first...")
 
 
+    def recv(self, bytes):
+        if self.connected:
+            try:
+                if bytes is not None:
+                    return self.ser.read(bytes).decode()
+            except Exception as e:
+                print(f'error in receive -> {e}')
+        else:
+            print('Not connected')
 
-    def recv(self, isjson=True, collect=False):
+
+    def recvline(self, isjson=True, collect=False):
         if self.connected:
             try:
                 rec = self.ser.readline().decode()
@@ -196,7 +206,7 @@ class SerialClass():
         if self.connected:
             while True:
                 self.send("dump1")
-                dump = self.recv(isjson=False)
+                dump = self.recvline(isjson=False)
                 try:
                     dump = json.loads(dump)
                 except:

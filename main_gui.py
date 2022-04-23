@@ -185,7 +185,7 @@ class Application(tk.Tk):
     #--------------------------------------------CREATING THE 'VANE / SERVO' TAB - ADDING WIDGETS--------------------------------------------
     def create_tuning_tab(self):
         self.tuning_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.tuning_tab, text='Tuning')
+        self.tab_parent.add(self.tuning_tab, text=self.tabs[0]['name'])
         canvas = tk.Canvas(self.tuning_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
@@ -330,7 +330,7 @@ class Application(tk.Tk):
     #--------------------------------------------CREATING THE 'MONITOR' TAB - ADDING WIDGETS--------------------------------------------
     def create_monitor_tab(self):
         self.monitor_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.monitor_tab, text='Monitor')
+        self.tab_parent.add(self.monitor_tab, text=self.tabs[1]['name'])
         canvas = tk.Canvas(self.monitor_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
@@ -548,7 +548,7 @@ class Application(tk.Tk):
     def create_graph_tab(self):
         self.graph_data = self.s.data
         self.graph_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.graph_tab, text='Graph')
+        self.tab_parent.add(self.graph_tab, text=self.tabs[2]['name'])
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
@@ -660,7 +660,7 @@ class Application(tk.Tk):
 #--------------------------------------------CREATING THE 'SETTINGS' TAB --------------------------------------------
     def create_calib_tab(self):
         self.settings_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.settings_tab, text='Calibrate')
+        self.tab_parent.add(self.settings_tab, text=self.tabs[3]['name'])
 
         Helvetica_11_bold = tkFont.Font(family='Helvetica', size=11, weight='bold')
 
@@ -718,7 +718,6 @@ class Application(tk.Tk):
             if (row+1) % 21 == 0:
                 col += 1
                 row = 0
-            print(row, col)
             rb = tk.Radiobutton(self.nw, text=f'{fname}', variable=self.fname_select, value=val)
             rb.place(anchor='n', relx=(0.14+col*0.25), rely=(0.01+0.047*row), relwidth=0.25, relheight=0.05)
             row += 1
@@ -726,45 +725,69 @@ class Application(tk.Tk):
         self.dlbut.configure(command=self.downloadfile)
         self.dlbut.bind('<Enter>', lambda event, x=self.dlbut : self.on_hover(x))
         self.dlbut.bind('<Leave>', lambda event, x=self.dlbut : self.on_hover_leave(x))
-        self.dlbut.place(anchor='n', relx=0.35, rely=0.95, relwidth=0.3, relheight=0.05)
+        self.dlbut.place(anchor='n', relx=0.16, rely=0.95, relwidth=0.3, relheight=0.05)
 
         self.dlallbut = tk.Button(self.nw, text='Download ALL', bg=self.colors["light grey"], relief='groove')
         self.dlallbut.configure(command=self.downloadall)
         self.dlallbut.bind('<Enter>', lambda event, x=self.dlallbut : self.on_hover(x))
         self.dlallbut.bind('<Leave>', lambda event, x=self.dlallbut : self.on_hover_leave(x))
-        self.dlallbut.place(anchor='n', relx=0.65, rely=0.95, relwidth=0.3, relheight=0.05)
+        self.dlallbut.place(anchor='n', relx=0.46, rely=0.95, relwidth=0.3, relheight=0.05)
+
+        self.progresslb = tk.Label(self.nw, text='File 100/100: 100%', bg=self.colors["white"])
+        self.progresslb.place(anchor='n', relx=0.8, rely=0.955)
+        self.download_thread = None
+
+    def set_progress(self, fn, tf, perc):
+        self.progresslb['text'] = f'File {fn}/{tf}: {perc}%'
+
+    def start_download_thread(self, fname, fn, tf):
+        self.download_thread = threading.Thread(target=self.download_loop, args=(fname, fn, tf))
+        self.download_thread.daemon = True
+        self.download_thread.start()
+
+    def download_loop(self, fname, fn, tf):
+        try:
+            dat = ''
+            self.s.send(f"getfile /logs/{fname}")
+            size = int(self.s.recvline(isjson=False))
+            step = 1024
+            while len(dat) < size:
+                x = int((len(dat)/size)*100)
+                if size-len(dat) < step:
+                    step = size-len(dat)
+                dat += self.s.recv(step)
+                self.set_progress(fn, tf, x)
+            x = 100
+            self.set_progress(fn, tf, x)
+            assert len(dat) == size
+            with open(f"downloaded_logs\{fname}", 'w') as f:
+                f.write(dat)
+            tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs folder.')    
+        except Exception as e:
+            tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
+        print('Exiting download loop')
 
 
     def downloadfile(self):
         if self.s.connected:
             fname = self.files[int(self.fname_select.get())]
-            path = f"/logs/{fname}"
-            print(f"Download: {path}")
-            self.s.send(f"getfile {path}")
-            try:
-                dat = f"bytes: {self.s.read_all()}"
-                with open(f"downloaded_logs\{fname}", 'w') as f:
-                    f.write(dat)
-                tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs.')    
-            except Exception as e:
-                tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
+            self.start_download_thread(fname, 1, 1)
         else:
             print('Connection Error')
 
 
     def downloadall(self):
         if self.s.connected:
-            for fname in self.files.values():
-                path = f"/logs/{fname}"
-                print(f"Download: {path}")
-                self.s.send(f"getfile {path}")
-                try:
-                    dat = f"bytes: {self.s.read_all()}"
-                    with open(f"downloaded_logs\{fname}", 'w') as f:
-                        f.write(dat)
-                except Exception as e:
-                    tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
-            tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in downloaded_logs folder.')    
+            tf = len(self.files)
+            try:
+                for idx, fname in enumerate(self.files.values()):
+                    if self.download_thread is not None:
+                        while self.download_thread.is_alive():
+                            time.sleep(0.5)
+                    self.start_download_thread(fname, idx, tf)
+                tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in /downloaded_logs folder.')    
+            except Exception as e:
+                print(f'error in downloadall: {e}')
         else:
             print('Connection Error')
 
@@ -804,7 +827,7 @@ class Application(tk.Tk):
     #--------------------------------------------CREATING THE 'ABOUT' TAB COMPANY AND CREATOR INFORMATION--------------------------------------------
     def create_about_tab(self):
         self.about_tab = ttk.Frame(self.tab_parent)
-        self.tab_parent.add(self.about_tab, text='About')
+        self.tab_parent.add(self.about_tab, text=self.tabs[4]['name'])
 
         Helvetica_11 = tkFont.Font(family='Helvetica', size=11)
         Helvetica_12 = tkFont.Font(family='Helvetica', size=12)
@@ -873,7 +896,7 @@ class Application(tk.Tk):
     #function checking connection state and using serialComms module to receive data
     def read_serial_loop(self):
         while self.s.connected and self.current_tab in [1, 2]:
-            self.s.recv(collect=True)
+            self.s.recvline(collect=True)
             time.sleep(0.0001)
             self.reading_thread = True
         self.reading_thread = False
@@ -975,7 +998,6 @@ class Application(tk.Tk):
                 concat += [self.monitor_buttons[i]["toggle-state"].upper(), x[i], str(self.monitor_values[i]["zero-rel-val"]), "\n"]
 
             save = ''.join(concat)
-            print("save:\n" + save)
             file.write(save)
 
 
@@ -994,7 +1016,6 @@ class Application(tk.Tk):
                 elif "DEFAULT_SERVO_SPEED" in line:
                     self.default_servo_speed = int(line.split("=")[1].strip())
                 elif "ZERO" in line:
-                    print(line)
                     val = float(line.split('/')[1].split('=')[1])
                     abs_rel_state = 'Abs' if 'ABS' in line.split('/')[0] else 'Rel'
 

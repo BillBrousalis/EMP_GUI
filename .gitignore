@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 .vscode
 __pycache__
 todo.txt
 downloaded_logs/
+=======
+todo.txt
+.vscode/
+__pycache__/
+>>>>>>> c8fc73fd3ec996e97ad78a5adafc3515644bb2c9

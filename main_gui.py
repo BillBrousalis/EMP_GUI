@@ -629,7 +629,6 @@ class Application(tk.Tk):
                     self.ani.event_source.start()
                 except:
                     #create thread for graphing - avoiding laggy interface with threading
-                    print('creating process for graph...')
                     self.graph_thread = threading.Thread(target=self.animation_thread)
                     self.graph_thread.daemon = True
                     self.graph_thread.start()
@@ -771,13 +770,26 @@ class Application(tk.Tk):
     def downloadfile(self):
         if self.s.connected:
             fname = self.files[int(self.fname_select.get())]
+<<<<<<< HEAD
             self.start_download_thread(fname, 1, 1)
+=======
+            path = f"/logs/{fname}"
+            self.s.send(f"getfile {path}")
+            try:
+                dat = f"bytes: {self.s.read_all()}"
+                with open(f"downloaded_logs\{fname}", 'w') as f:
+                    f.write(dat)
+                tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs.')    
+            except Exception as e:
+                tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
+>>>>>>> c8fc73fd3ec996e97ad78a5adafc3515644bb2c9
         else:
             print('Connection Error')
 
 
     def downloadall(self):
         if self.s.connected:
+<<<<<<< HEAD
             tf = len(self.files)
             try:
                 for idx, fname in enumerate(self.files.values()):
@@ -788,6 +800,18 @@ class Application(tk.Tk):
                 tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in /downloaded_logs folder.')    
             except Exception as e:
                 print(f'error in downloadall: {e}')
+=======
+            for fname in self.files.values():
+                path = f"/logs/{fname}"
+                self.s.send(f"getfile {path}")
+                try:
+                    dat = f"bytes: {self.s.read_all()}"
+                    with open(f"downloaded_logs\{fname}", 'w') as f:
+                        f.write(dat)
+                except Exception as e:
+                    tk.messagebox.showinfo(title='Error', message=f'Error: {e}')    
+            tk.messagebox.showinfo(title='Success', message='Downloads successful!\nFiles are in downloaded_logs folder.')    
+>>>>>>> c8fc73fd3ec996e97ad78a5adafc3515644bb2c9
         else:
             print('Connection Error')
 
@@ -864,7 +888,6 @@ class Application(tk.Tk):
     # small function to open url link provided in the 'about' tab
     def open_link(self, label):
         url = label.get('1.0', 'end')
-        print('url = ', url)
         webbrowser.open_new(url)
 
 

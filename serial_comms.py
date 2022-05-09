@@ -97,7 +97,7 @@ class SerialClass():
         if self.connected:
             try:
                 rec = self.ser.readline().decode()
-                print(rec)
+                print('rec=', rec)
                 if isjson:
                     rec = json.loads(rec)
                 if collect:
@@ -112,7 +112,7 @@ class SerialClass():
     def recvuntil(self, x):
         if self.connected:
             try:
-                self.ser.read_until(x.encode())
+                return self.ser.read_until(x.encode()).decode()
             except Exception as e:
                 print(f'error in recvuntil: {e}')
         else:

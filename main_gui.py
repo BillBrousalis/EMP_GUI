@@ -666,7 +666,7 @@ class Application(tk.Tk):
         canvas = tk.Canvas(self.settings_tab, width=self.WIDTH, height=self.HEIGHT, bg=self.colors["white"], relief='groove')
         canvas.place(anchor='n', relx=0.5, rely=0, relwidth=1, relheight=1)
 
-        self.settings_info_label = tk.Label(canvas, text='< testing >', font=Helvetica_11_bold, justify='center', relief='groove')
+        self.settings_info_label = tk.Label(canvas, text='<-DEBUG->', font=Helvetica_11_bold, justify='center', relief='groove')
         self.settings_info_label.place(anchor='n', relx=0.7, rely=0.02, relwidth=0.5, relheight=0.7)
 
         self.gyro_calibration_button = tk.Button(canvas, text='Start Gyro\nCalibration', font=Helvetica_11_bold, bg=self.colors["light grey"],
@@ -694,54 +694,101 @@ class Application(tk.Tk):
         self.get_logs_but.place(anchor='n', relx=0.25, rely=0.5, relwidth=0.31, relheight=0.1)
         self.nw = None
 
-
     def get_logs_but_func(self):
         if self.nw is not None: return None
         if not self.s.connected:
             tk.messagebox.showinfo(title='Error', message='You are not connected to a serial port.')    
             return None
-        self.s.serialFlush()
-        self.s.send("getlist")
-        list = self.s.read_all().split("\n")
-        list = [x for x in list if x not in ["\n", ""]]
-        print(f"LOGS:\n{list}")
         self.nw = Toplevel(self)
         self.nw.geometry("500x600")
         self.nw.minsize(500,600)
+        #self.nw.resizable(False, False)
         self.nw.title("--Saved Log Files--")
         self.nw.protocol("WM_DELETE_WINDOW", self.nw_exit)
+        self.nwcanvas = tk.Canvas(self.nw, bg=self.colors["white"], width=10000, height=600)
+        self.nwcanvas.pack(anchor='n')#, expand=True, fill='y')
+        '''
+        hbar = tk.Scrollbar(self.nwcanvas, orient='horizontal', command=self.nwcanvas.xview)
+        hbar.place(anchor='n', relx=0.5, rely=0.96, relwidth=1, relheight=0.04)
+        self.nwcanvas['xscrollcommand'] = hbar.set
+        '''
+
         self.fname_select = tk.StringVar(self.nw, "1")
-        self.files = {key:val for (key,val) in zip([i for i in range(1,len(list)+1)], list)}
-        row, col = 0, 0
-        for (val, fname) in self.files.items():
-            if (row+1) % 21 == 0:
-                col += 1
-                row = 0
-            rb = tk.Radiobutton(self.nw, text=f'{fname}', variable=self.fname_select, value=val)
-            rb.place(anchor='n', relx=(0.14+col*0.25), rely=(0.01+0.047*row), relwidth=0.25, relheight=0.05)
-            row += 1
-        self.dlbut = tk.Button(self.nw, text='Download', bg=self.colors["light grey"], relief='groove')
+        self.rblist = []
+        self.updatelist()
+        self.dlbut = tk.Button(self.nwcanvas, text='Download', bg=self.colors["light grey"], relief='groove')
         self.dlbut.configure(command=self.downloadfile)
         self.dlbut.bind('<Enter>', lambda event, x=self.dlbut : self.on_hover(x))
         self.dlbut.bind('<Leave>', lambda event, x=self.dlbut : self.on_hover_leave(x))
-        self.dlbut.place(anchor='n', relx=0.16, rely=0.95, relwidth=0.3, relheight=0.05)
+        self.dlbut.place(anchor='n', relx=0.125, rely=0.95, relwidth=0.25, relheight=0.05)
+        self.deletebut = tk.Button(self.nwcanvas, text='Delete', bg=self.colors["light grey"], relief='groove')
+        self.deletebut.configure(command=self.deletefile)
+        self.deletebut.bind('<Enter>', lambda event, x=self.deletebut : self.on_hover(x))
+        self.deletebut.bind('<Leave>', lambda event, x=self.deletebut : self.on_hover_leave(x))
+        self.deletebut.place(anchor='n', relx=0.38, rely=0.95, relwidth=0.25, relheight=0.05)
 
-        self.progresslb = tk.Label(self.nw, text='Download [%]', bg=self.colors["white"])
-        self.progresslb.place(anchor='n', relx=0.6, rely=0.955)
+        self.progresslb = tk.Label(self.nwcanvas, text='Download [%]', bg=self.colors["white"])
+        self.progresslb.place(anchor='n', relx=0.75, rely=0.955)
         self.download_thread = None
+
+
+    def deletefile(self):
+        self.s.serialFlush()
+        fname = self.files[int(self.fname_select.get())]
+        self.s.send(f'delfile /logs/{fname}')
+        errcheck = self.s.recvuntil('}')
+        if "error" in errcheck:
+            tk.messagebox.showinfo(title='Error', message='Error deleting file')    
+        time.sleep(0.1)
+        tmpselect = int(self.fname_select.get()) - 1
+        if tmpselect >= 1:
+            self.fname_select.set(str(tmpselect))
+        else:
+            self.fname_select.set('1')
+        self.updatelist()
+
+
+    def updatelist(self):
+        # TODO: make shit fit in frame /
+        # have scrollbar working for shit not fitting in frame
+        self.s.serialFlush()
+        self.s.send('getlist')
+        list = self.s.recvuntil('}').split("\n")[:-1]
+        print(list)
+        list = [x for x in list if x not in ["\n", ""]]
+        self.files = {key:val for (key,val) in zip([i for i in range(1,len(list)+1)], list)}
+        print(f"LOGS:\n{list}")
+        for widget in self.rblist:
+            widget.destroy()
+        self.rblist.clear()
+        row, col = 0, 0
+        for (val, fname) in self.files.items():
+            if (row+1) % 20 == 0:
+                col += 1
+                row = 0
+            rb = tk.Radiobutton(self.nwcanvas, text=f'{fname}', variable=self.fname_select, value=val)
+            rb.place(anchor='n', relx=(0.14+col*0.25), rely=(0.01+0.047*row), relwidth=0.25, relheight=0.05)
+            #print(f'DEBUG: relx {0.14+col*0.25} | rely {0.01+0.047*row}')
+            self.rblist.append(rb)
+            row += 1
+
 
     def set_progress(self, perc):
         self.progresslb['text'] = f'Download [{perc}%]'
+
 
     def start_download_thread(self, fname, fn, tf):
         self.download_thread = threading.Thread(target=self.download_loop, args=(fname,))
         self.download_thread.daemon = True
         self.download_thread.start()
 
+
     def download_loop(self, fname):
         try:
+            self.s.serialFlush()
             dat = ''
             self.s.send(f"getfile /logs/{fname}")
+            _ = self.s.recvline()
             size = int(self.s.recvline(isjson=False))
             step = 1024
             while len(dat) < size:
@@ -755,6 +802,7 @@ class Application(tk.Tk):
             if len(dat) != size:
                 tk.messagebox.showinfo(title='Error', message='Error during download.')    
                 return None
+            self.s.recvuntil('}')
             with open(f"downloaded_logs\{fname}", 'w') as f:
                 f.write(dat)
             tk.messagebox.showinfo(title='Success', message='Download successful!\nFile is in /downloaded_logs folder.')    

@@ -705,9 +705,9 @@ class Application(tk.Tk):
         #self.nw.resizable(False, False)
         self.nw.title("--Saved Log Files--")
         self.nw.protocol("WM_DELETE_WINDOW", self.nw_exit)
-        self.nwcanvas = tk.Canvas(self.nw, bg=self.colors["white"], width=10000, height=600)
-        self.nwcanvas.pack(anchor='n')#, expand=True, fill='y')
         '''
+        self.nwcanvas = tk.Canvas(self.nw, bg=self.colors["white"]) #, width=10000, height=600)
+        self.nwcanvas.pack(anchor='n')#, expand=True, fill='both')
         hbar = tk.Scrollbar(self.nwcanvas, orient='horizontal', command=self.nwcanvas.xview)
         hbar.place(anchor='n', relx=0.5, rely=0.96, relwidth=1, relheight=0.04)
         self.nwcanvas['xscrollcommand'] = hbar.set
@@ -716,18 +716,18 @@ class Application(tk.Tk):
         self.fname_select = tk.StringVar(self.nw, "1")
         self.rblist = []
         self.updatelist()
-        self.dlbut = tk.Button(self.nwcanvas, text='Download', bg=self.colors["light grey"], relief='groove')
+        self.dlbut = tk.Button(self.nw, text='Download', bg=self.colors["light grey"], relief='groove')
         self.dlbut.configure(command=self.downloadfile)
         self.dlbut.bind('<Enter>', lambda event, x=self.dlbut : self.on_hover(x))
         self.dlbut.bind('<Leave>', lambda event, x=self.dlbut : self.on_hover_leave(x))
         self.dlbut.place(anchor='n', relx=0.125, rely=0.95, relwidth=0.25, relheight=0.05)
-        self.deletebut = tk.Button(self.nwcanvas, text='Delete', bg=self.colors["light grey"], relief='groove')
+        self.deletebut = tk.Button(self.nw, text='Delete', bg=self.colors["light grey"], relief='groove')
         self.deletebut.configure(command=self.deletefile)
         self.deletebut.bind('<Enter>', lambda event, x=self.deletebut : self.on_hover(x))
         self.deletebut.bind('<Leave>', lambda event, x=self.deletebut : self.on_hover_leave(x))
         self.deletebut.place(anchor='n', relx=0.38, rely=0.95, relwidth=0.25, relheight=0.05)
 
-        self.progresslb = tk.Label(self.nwcanvas, text='Download [%]', bg=self.colors["white"])
+        self.progresslb = tk.Label(self.nw, text='Download [%]', bg=self.colors["white"])
         self.progresslb.place(anchor='n', relx=0.75, rely=0.955)
         self.download_thread = None
 
@@ -766,7 +766,7 @@ class Application(tk.Tk):
             if (row+1) % 20 == 0:
                 col += 1
                 row = 0
-            rb = tk.Radiobutton(self.nwcanvas, text=f'{fname}', variable=self.fname_select, value=val)
+            rb = tk.Radiobutton(self.nw, text=f'{fname}', variable=self.fname_select, value=val)
             rb.place(anchor='n', relx=(0.14+col*0.25), rely=(0.01+0.047*row), relwidth=0.25, relheight=0.05)
             #print(f'DEBUG: relx {0.14+col*0.25} | rely {0.01+0.047*row}')
             self.rblist.append(rb)

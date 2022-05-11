@@ -733,6 +733,9 @@ class Application(tk.Tk):
 
 
     def deletefile(self):
+        if self.download_thread.is_alive():
+            tk.messagebox.showinfo(title='Error', message="Can't delete while download is running.")    
+            return None
         self.s.serialFlush()
         fname = self.files[int(self.fname_select.get())]
         self.s.send(f'delfile /logs/{fname}')

@@ -9,7 +9,7 @@ from datetime import datetime
 class SerialClass():
     #------------------------------------------generic variables------------------------------------------
     default_servo_speed = 50
-    x_limit = 50    # seconds to display in the X axis
+    x_limit = 50    # n samples to display in the X axis
     
     #------------------------------------------INITIALIZING------------------------------------------
     def __init__(self, com=None, baud=None):
